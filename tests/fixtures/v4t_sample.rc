@@ -1,0 +1,150 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+IDR_MAINFRAME           ICON                    "res\\V4T.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_BARCODE_PROPS DIALOGEX 0, 0, 316, 214
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Barcode Properties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Barcodes List:",IDC_STATIC,7,7,49,8
+    LTEXT           "Bar Height",IDC_STATIC,163,26,36,8
+    EDITTEXT        IDC_BAR_HEIGHT,205,24,40,14,ES_AUTOHSCROLL
+    LTEXT           "Width",IDC_STATIC,163,45,20,8
+    EDITTEXT        IDC_BAR_WIDTH,205,43,40,14,ES_AUTOHSCROLL
+    CONTROL         "Human Readable",IDC_HUMAN_READABLE,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,163,64,68,10
+    CONTROL         "Auto parity",IDC_AUTO_PARITY,"Button",BS_AUTOCHECKBOX |
+                    WS_TABSTOP,163,80,60,10
+    LTEXT           "Bearer thickness",IDC_STATIC,163,99,56,8
+    LTEXT           "Module size",IDC_STATIC,163,118,40,8
+    GROUPBOX        "Extra options",IDC_STATIC,156,7,153,140
+    PUSHBUTTON      "Add  variable data",IDC_ADD_VARIABLE,7,160,84,16
+    LTEXT           "This distance cannot be greater than print spacing",
+                    IDC_HINT,7,182,240,20,SS_LEFTNOWORDWRAP
+    DEFPUSHBUTTON   "OK",IDOK,205,192,50,16
+    PUSHBUTTON      "Cancel",IDCANCEL,259,192,50,16
+    CONTROL         "",IDC_PREVIEW,"Static",SS_BLACKFRAME,7,20,140,130
+    CONTROL         IDB_TOOLBAR,IDC_TOOLBAR_IMAGE,"Static",SS_BITMAP,7,7,16,16
+END
+
+IDD_PEN_OFFSETS DIALOGEX 0, 0, 240, 160
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Group Print Offsets",IDC_STATIC,7,7,226,80
+    LTEXT           "Pen",IDC_STATIC,14,22,12,8
+    LTEXT           "Horizontal Offset",IDC_STATIC,60,22,56,8
+    LTEXT           "Print Offset",IDC_STATIC,130,22,40,8
+    LTEXT           "Vertical Offsets",IDC_STATIC,14,96,52,8
+    EDITTEXT        IDC_PEN_1,60,34,40,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_PEN_2,60,52,40,14,ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Traverse Printing",IDC_TRAVERSE,14,120,68,10
+    RTEXT           "Spacing",IDC_STATIC,140,120,28,8
+    COMBOBOX        IDC_ORIENTATION,180,118,53,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MAINFRAME MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New\tCtrl+N",                ID_FILE_NEW
+        MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_APP_EXIT
+    END
+    POPUP "&Printer"
+    BEGIN
+        MENUITEM "&Purge Settings",             ID_PRINTER_PURGE
+        POPUP "&Diagnostics"
+        BEGIN
+            MENUITEM "&Print and Verify",       ID_DIAG_VERIFY
+        END
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_PRINT_STARTED       "Print started"
+    IDS_SERVICE_RESTARTED   "Service restarted"
+    IDS_SERVICE_NOT_RESTART "Service not restarted"
+    IDS_FEATURE_OFF         "Feature is not enabled"
+    IDS_FIRING_RANGE        "Please input from %.1fV to %.1fV."
+    IDS_LENGTH_LIMIT        "The length must be less <V1> chars"
+    IDS_VALUE_RANGE         "Value must be between <V1> and <V2>"
+    IDS_NO_CHANGE_PRINTING  "Parameter cannot be changed when printing"
+    IDS_PURGE_OFFSET        "Purge offset must be less than "
+                            "group offset"
+    IDS_MCR_RESTART         "Please restart software for connecting MCR."
+    IDS_UNITS_MM            "mm"
+    IDS_DATE_PATTERN        "YYYY"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_TITLE_FORMAT        "Date&&Time Format"
+    IDS_TITLE_OFFSET        "Date&&Time Offset"
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 4,1,0,0
+ PRODUCTVERSION 4,1,0,0
+ FILEFLAGSMASK 0x3fL
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Sellenis"
+            VALUE "FileDescription", "V4T"
+        END
+    END
+END
+
+IDD_BARCODE_PROPS AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
