@@ -6,5 +6,13 @@ idea of what a message is.
 """
 
 from .model import Message, Origin, OriginKind
+from .translations import Translation, TranslationSet, TranslationState
 
-__all__ = ["Message", "Origin", "OriginKind"]
+__all__ = [
+    "Message",
+    "Origin",
+    "OriginKind",
+    "Translation",
+    "TranslationSet",
+    "TranslationState",
+]
