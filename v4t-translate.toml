@@ -1,0 +1,51 @@
+# V4T-TIJ localisation project.
+#
+# Paths are relative to this file. The two rc files below are the Win32 HMI
+# and the configuration tool, which share a lot of strings and none of their
+# resource ids.
+
+[project]
+name = "V4T-TIJ"
+source_locale = "en-US"
+catalog_dir = "catalog"
+workbook_dir = "Translate"
+output_dir = "out"
+glossary = "glossary/v4t-terms.csv"
+
+[[source]]
+kind = "rc"
+path = "../V4T-TIJ/V4T/V4T.rc"
+symbols = "../V4T-TIJ/V4T/resource.h"
+encoding = "cp1252"
+
+[[source]]
+kind = "rc"
+path = "../V4T-TIJ/Config/Config.rc"
+symbols = "../V4T-TIJ/Config/resource.h"
+encoding = "cp1252"
+
+[protected]
+# Added to the built-in list rather than replacing it.
+patterns = [
+    "SENC",
+    "MCR",
+    "TIJ",
+    "V4T",
+    "8PEN",
+]
+
+[locale."zh-TW"]
+workbook = "Translate/Translation - V4T-TIJ - Taiwan.xlsx"
+panel = "tij-800x600"
+font = "fonts/pmingliu-9.fmx"
+
+[locale."de-DE"]
+workbook = "Translate/Translation - V4T-TIJ8PEN - German.xlsx"
+panel = "tij-800x600"
+font = "fonts/tahoma-8.fmx"
+
+[check]
+fail_on = "error"
+# The glossary is still being agreed with the distributor, so its findings
+# are advisory until that lands.
+demote = ["glossary"]
