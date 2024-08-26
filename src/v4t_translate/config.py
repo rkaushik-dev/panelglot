@@ -50,7 +50,10 @@ DEFAULT_PROTECTED_PATTERNS: tuple[str, ...] = (
     r"YY|YYYY|MM|MMM|MMMM|DD|DDD|DDDD|WW|JJJ|UU",
     r"hh|HH|SS|tt",
     r"hh:mm(:ss)?",
-    r"%[-+ #0-9.]*[hlL]?[sdfixXeEgGcpu%]",
+    # A bare specifier, optionally with the unit stuck to it: "%d", "%.1fV",
+    # "%d mm". A resource string that is only a formatted number and a unit is
+    # never translatable, and every one of them reached a translator before.
+    r"%[-+ #0-9.]*[hlL]?[sdfixXeEgGcpu%] ?[A-Za-z%°]{0,3}",
     r"<V\d>",
 )
 
