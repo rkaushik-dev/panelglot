@@ -1,0 +1,7 @@
+# The V4T-Mini character LCD. Fixed cell, ASCII only, no accented Latin.
+name: Mini 5x7
+pixel_size: 7
+line_height: 8
+default_width: 6
+
+20..7E 6

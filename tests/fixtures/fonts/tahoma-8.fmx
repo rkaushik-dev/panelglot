@@ -1,0 +1,40 @@
+# Tahoma 8pt as compiled for the TIJ panel build.
+# Exported by fontbuild from the firmware tree, do not edit by hand.
+name: Tahoma
+pixel_size: 11
+line_height: 13
+default_width: 6
+
+# Latin-1, with the widths that actually differ from the default called out.
+20..7E 6
+20 3
+21 3
+27 2
+2C 3
+2E 3
+3A 3
+3B 3
+49 3
+4D 9
+57 11
+57 11
+69 3
+6A 3
+6C 3
+6D 9
+77 9
+A0..FF 6
+DF 7
+E4 6
+F6 6
+FC 6
+
+# Currency and punctuation the German and Turkish sheets use.
+20AC 6
+2013 6
+2014 10
+2018 3
+2019 3
+201C 5
+201D 5
+2026 10
