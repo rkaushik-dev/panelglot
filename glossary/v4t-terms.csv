@@ -1,0 +1,16 @@
+term,locale,translation,note
+pen,de-DE,Stift,The physical cartridge. Never Feder or Patrone.
+printhead,de-DE,Druckkopf,Compounds are fine: Druckkopfspannung.
+purge,de-DE,Bereinigung,Agreed with the distributor 2024-06.
+photocell,de-DE,Fotozelle,
+spacing,de-DE,Abstand,
+offset,de-DE,Versatz,Not Offset. The English word reads as a printing term here.
+barcode,de-DE,Barcode,Stays English by agreement.
+firing voltage,de-DE,Zündspannung,
+traverse,de-DE,Querdruck,
+pen,zh-TW,筆,
+printhead,zh-TW,列印頭,Not 打印頭. That is the mainland term.
+purge,zh-TW,清洗,
+photocell,zh-TW,光電感應器,
+spacing,zh-TW,間距,
+barcode,zh-TW,條碼,The shipped sheet says 條形碼 throughout and it has to be fixed.
