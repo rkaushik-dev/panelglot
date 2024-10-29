@@ -144,3 +144,90 @@ def test_module_entry_point_exists():
     from v4t_translate.__main__ import main as module_main
 
     assert callable(module_main)
+
+
+def translate(project, tag, pairs):
+    from v4t_translate.catalog.ids import message_key
+    from v4t_translate.catalog.store import load_translations, save_translations
+    from v4t_translate.catalog.translations import Translation, TranslationState
+    from v4t_translate.config import load_config
+
+    config = load_config(project / "v4t-translate.toml")
+    path = config.translations_path(tag)
+    translations = load_translations(path)
+    for source, target in pairs.items():
+        translations.set(message_key(source),
+                         Translation(text=target, state=TranslationState.APPROVED))
+    save_translations(path, translations)
+
+
+def test_help_lists_check(runner):
+    assert "check" in runner.invoke(main, ["--help"]).output
+
+
+def test_check_before_extract_is_an_error(runner, project):
+    result = invoke(runner, project, "check")
+    assert result.exit_code != 0
+
+
+def test_check_of_an_untranslated_project_passes(runner, project):
+    invoke(runner, project, "extract")
+    result = invoke(runner, project, "check")
+    assert result.exit_code == 0
+    assert "nothing found" in result.output
+
+
+def test_check_names_the_panel_and_font(runner, project):
+    invoke(runner, project, "extract")
+    result = invoke(runner, project, "check")
+    assert "de-DE:" in result.output
+    assert "tij-800x600" in result.output
+
+
+def test_check_fails_on_a_placeholder_defect(runner, project):
+    invoke(runner, project, "extract")
+    translate(project, "de-DE",
+              {"Please input from %.1fV to %.1fV.": "Bitte einen Wert eingeben."})
+    result = invoke(runner, project, "check")
+    assert result.exit_code != 0
+    assert "placeholders" in result.output
+
+
+def test_fail_on_never_still_prints_the_findings(runner, project):
+    invoke(runner, project, "extract")
+    translate(project, "de-DE",
+              {"Please input from %.1fV to %.1fV.": "Bitte einen Wert eingeben."})
+    result = invoke(runner, project, "check", "--fail-on", "never")
+    assert result.exit_code == 0
+    assert "placeholders" in result.output
+
+
+def test_check_can_be_limited_to_one_locale(runner, project):
+    invoke(runner, project, "extract")
+    result = invoke(runner, project, "check", "-l", "de-DE")
+    assert "de-DE:" in result.output
+
+
+def test_no_detail_drops_the_explanations(runner, project):
+    invoke(runner, project, "extract")
+    translate(project, "de-DE", {"Pen": "Stift"})
+    with_detail = invoke(runner, project, "check", "--fail-on", "never").output
+    without = invoke(runner, project, "check", "--fail-on", "never", "--no-detail").output
+    assert len(without) < len(with_detail)
+
+
+def test_quiet_check_prints_nothing_but_still_fails(runner, project):
+    invoke(runner, project, "extract")
+    translate(project, "de-DE",
+              {"Please input from %.1fV to %.1fV.": "Bitte einen Wert eingeben."})
+    result = invoke(runner, project, "-q", "check")
+    assert result.exit_code != 0
+    assert result.output.strip() == ""
+
+
+def test_run_returns_the_check_failed_code(project, monkeypatch):
+    monkeypatch.chdir(project)
+    run(["extract"])
+    translate(project, "de-DE",
+              {"Please input from %.1fV to %.1fV.": "Bitte einen Wert eingeben."})
+    assert run(["check"]) == 2

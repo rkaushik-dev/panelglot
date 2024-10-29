@@ -18,8 +18,10 @@ import click
 
 from . import __version__
 from .config import ProjectConfig, load_config
-from .errors import V4TError
+from .errors import CheckFailed, V4TError
+from .ops.check import check_project
 from .ops.extract import ExtractResult, extract_project
+from .report.console import DEFAULT_LIMIT, format_check
 
 __all__ = ["main"]
 
@@ -48,6 +50,10 @@ class Context:
         click.echo(message)
 
     def warn(self, message: str) -> None:
+        # --quiet says only errors, and a warning is not one. Suppressing it
+        # here rather than at each call site is what keeps -q honest.
+        if self.quiet:
+            return
         click.echo(click.style("warning: ", fg="yellow") + message, err=True)
 
 
@@ -79,6 +85,37 @@ def extract(context: Context, dry_run: bool, keep_going: bool) -> None:
     """Read every source and update the catalog."""
     result = extract_project(context.config, dry_run=dry_run, keep_going=keep_going)
     _report_extract(context, result, dry_run=dry_run)
+
+
+@main.command()
+@click.option("--locale", "-l", "locales", multiple=True,
+              help="Only this language. Repeatable. Defaults to all of them.")
+@click.option("--limit", type=int, default=DEFAULT_LIMIT, show_default=True,
+              help="Findings shown per rule. 0 for all of them.")
+@click.option("--no-detail", is_flag=True, help="One line per finding.")
+@click.option("--fail-on", type=click.Choice(["error", "warning", "never"]),
+              help="Override the project's fail_on setting.")
+@pass_context
+def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: bool,
+          fail_on: str | None) -> None:
+    """Run every rule over the translated catalog."""
+    config = context.config
+    result = check_project(config, locales=list(locales) or None)
+
+    for warning in result.warnings:
+        context.warn(warning)
+
+    if not context.quiet:
+        click.echo(format_check(result, limit=limit, show_detail=not no_detail))
+
+    threshold = fail_on or config.check.fail_on
+    if result.should_fail(threshold):
+        raise CheckFailed(
+            f"{len(result.report.errors)} errors and "
+            f"{len(result.report.warnings)} warnings",
+            error_count=len(result.report.errors),
+            warning_count=len(result.report.warnings),
+        )
 
 
 def _report_extract(context: Context, result: ExtractResult, *, dry_run: bool) -> None:
