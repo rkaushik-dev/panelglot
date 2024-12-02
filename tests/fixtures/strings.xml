@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">V4T Mobile</string>
+    <string name="printer_status">Printer status</string>
+    <string name="print_started">Print started</string>
+    <string name="firing_voltage">Firing Voltage</string>
+    <string name="voltage_range">Please input from %1$.1fV to %2$.1fV.</string>
+    <string name="cannot_change">Parameter cannot be changed when printing</string>
+    <string name="dont_touch">It\'s not safe to open the printhead</string>
+    <string name="trailing_space">"Purge offset must be less than "</string>
+    <string name="with_break">First line\nSecond line</string>
+    <string name="wrapped_in_source">
+        A caption that the developer
+        wrapped over two lines
+    </string>
+    <string name="units_mm">mm</string>
+    <string name="empty_on_purpose"></string>
+    <string name="with_markup">Tap <b>Purge</b> to continue</string>
+
+    <plurals name="pen_count">
+        <item quantity="one">%d pen</item>
+        <item quantity="other">%d pens</item>
+    </plurals>
+
+    <string-array name="orientations">
+        <item>Normal</item>
+        <item>Inverted</item>
+    </string-array>
+
+    <string-array name="internal_codes" translatable="false">
+        <item>SENC</item>
+        <item>MCR</item>
+    </string-array>
+
+    <color name="accent">#FF6600</color>
+</resources>
