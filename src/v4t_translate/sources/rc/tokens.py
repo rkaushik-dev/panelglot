@@ -34,7 +34,14 @@ class TokenKind(Enum):
 
 @dataclass(frozen=True)
 class Token:
-    """One lexed token, with enough position to report a useful error."""
+    """One lexed token, with enough position to report a useful error.
+
+    ``start`` and ``end`` are absolute character offsets into the source text.
+    Line and column are for people; the offsets are for the writer, which
+    rewrites captions in place and needs to know exactly which characters to
+    replace. Reconstructing an offset from a line and column afterwards is
+    possible and was a bug farm.
+    """
 
     kind: TokenKind
     text: str
@@ -44,6 +51,17 @@ class Token:
     #: Parsed value. A string token carries its unescaped contents here, a
     #: number token carries an int, everything else carries ``None``.
     value: str | int | None = None
+
+    #: Offset of the first character of this token in the source text.
+    start: int = 0
+
+    #: Offset one past the last character, so ``text[start:end]`` is the token
+    #: exactly as written, quotes and all.
+    end: int = 0
+
+    @property
+    def span(self) -> tuple[int, int]:
+        return (self.start, self.end)
 
     def is_ident(self, *names: str) -> bool:
         """True when this is an identifier matching one of ``names``, case-insensitively.

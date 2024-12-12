@@ -52,6 +52,9 @@ class Control:
     ordinal: int = 0
     """Position within the dialog, counted from zero. Disambiguates IDC_STATIC."""
 
+    caption_span: tuple[int, int] | None = None
+    """Offsets of the caption literal, quotes included, for the writer."""
+
     styles: list[str] = field(default_factory=list)
     """Style tokens as written, ``|`` separated in the source."""
 
@@ -83,8 +86,12 @@ class Dialog:
     width: int = 0
     height: int = 0
     caption: str | None = None
+    caption_span: tuple[int, int] | None = None
     font_size: int = 8
     font_name: str = "MS Shell Dlg"
+    font_span: tuple[int, int] | None = None
+    """Offsets of the font name literal, so a locale can be given its own."""
+
     controls: list[Control] = field(default_factory=list)
     styles: list[str] = field(default_factory=list)
     line: int = 0
@@ -109,6 +116,8 @@ class StringEntry:
     symbol: str
     text: str
     line: int = 0
+    span: tuple[int, int] | None = None
+    """Offsets of the literal, or of the first and last of a joined run."""
 
 
 @dataclass
@@ -129,6 +138,7 @@ class MenuItem:
     is_popup: bool = False
     is_separator: bool = False
     line: int = 0
+    span: tuple[int, int] | None = None
 
     def walk(self) -> Iterator[MenuItem]:
         """This item and every item beneath it, depth first."""
@@ -177,6 +187,12 @@ class ResourceScript:
     directives: list[str] = field(default_factory=list)
     language: str | None = None
     """The last ``LANGUAGE`` statement seen, as written."""
+
+    language_span: tuple[int, int] | None = None
+    """Offsets of that statement, so a localised copy can carry its own."""
+
+    text: str = ""
+    """The source text this was parsed from. The writer rewrites spans of it."""
 
     def dialog(self, symbol: str) -> Dialog | None:
         for dialog in self.dialogs:

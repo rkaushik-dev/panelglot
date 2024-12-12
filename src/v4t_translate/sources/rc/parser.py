@@ -53,11 +53,11 @@ _TEXT_BEARING_CLASSES = frozenset({"BUTTON", "STATIC", "MSCTLS_UPDOWN32"})
 
 
 class _Parser:
-    def __init__(self, tokens: list[Token], path: str) -> None:
+    def __init__(self, tokens: list[Token], path: str, text: str = "") -> None:
         self.tokens = tokens
         self.path = path
         self.index = 0
-        self.script = ResourceScript(path=path)
+        self.script = ResourceScript(path=path, text=text)
 
     # -- cursor ---------------------------------------------------------
 
@@ -112,11 +112,15 @@ class _Parser:
     def parse_language(self) -> None:
         start = self.advance()
         parts: list[str] = [start.text.upper()]
+        end = start.end
         while self.current.line == start.line and not self.at_end():
-            parts.append(self.advance().text)
+            token = self.advance()
+            parts.append(token.text)
+            end = token.end
         # Rejoin so the result matches Locale.language_statement exactly, which
         # is what the writer compares against when it swaps the language line.
         self.script.language = " ".join(parts).replace(" ,", ",")
+        self.script.language_span = (start.start, end)
 
     def parse_named_resource(self) -> None:
         """Handle ``<name> <STATEMENT> ...``, the shape of every other resource."""
@@ -225,28 +229,37 @@ class _Parser:
             if self.current.kind is TokenKind.COMMA:
                 self.advance()
 
-            text = self.read_joined_string()
+            text, span = self.read_joined_string()
             table.entries.append(
-                StringEntry(symbol=symbol_token.text, text=text, line=symbol_token.line)
+                StringEntry(symbol=symbol_token.text, text=text,
+                            line=symbol_token.line, span=span)
             )
 
         self.expect(TokenKind.END)
         return table
 
-    def read_joined_string(self) -> str:
+    def read_joined_string(self) -> tuple[str, tuple[int, int]]:
         """Read one or more adjacent string literals as a single value.
 
         Long messages are written across several lines in the source and the
         resource compiler concatenates them. Doing it here means the catalog
         never sees the line breaks the author used for readability.
+
+        The span runs from the first quote to the last, so rewriting it
+        replaces the whole run with one literal. The wrapping the author chose
+        is lost, which is the right trade: it was chosen for the English.
         """
         if self.current.kind is not TokenKind.STRING:
             raise self.fail(f"expected a string, found {self.current.kind}")
 
         parts: list[str] = []
+        start = self.current.start
+        end = self.current.end
         while self.current.kind is TokenKind.STRING:
-            parts.append(str(self.advance().value))
-        return "".join(parts)
+            token = self.advance()
+            parts.append(str(token.value))
+            end = token.end
+        return "".join(parts), (start, end)
 
     # -- dialogs --------------------------------------------------------
 
@@ -281,6 +294,7 @@ class _Parser:
 
         if upper == "CAPTION" and arguments and arguments[0].kind is TokenKind.STRING:
             dialog.caption = str(arguments[0].value)
+            dialog.caption_span = arguments[0].span
         elif upper == "FONT":
             self.apply_font(dialog, arguments)
         elif upper == "STYLE":
@@ -296,6 +310,7 @@ class _Parser:
         for token in arguments:
             if token.kind is TokenKind.STRING:
                 dialog.font_name = str(token.value)
+                dialog.font_span = token.span
                 break
 
     def parse_control(self, ordinal: int) -> Control | None:
@@ -332,6 +347,7 @@ class _Parser:
             statement=keyword.text,
             symbol=_text_of(groups, 1),
             caption=caption,
+            caption_span=_span_of(groups, 0),
             line=keyword.line,
             ordinal=ordinal,
         )
@@ -352,6 +368,7 @@ class _Parser:
             statement=keyword.text,
             symbol=_text_of(groups, 1),
             caption=caption,
+            caption_span=_span_of(groups, 0) if caption is not None else None,
             window_class=window_class,
             line=keyword.line,
             ordinal=ordinal,
@@ -396,9 +413,9 @@ class _Parser:
         keyword = self.advance()
 
         if keyword.is_ident("POPUP"):
-            text = self.read_joined_string()
+            text, span = self.read_joined_string()
             self.read_statement_arguments(keyword.line)
-            item = MenuItem(text=text, is_popup=True, line=keyword.line)
+            item = MenuItem(text=text, is_popup=True, line=keyword.line, span=span)
             self.expect(TokenKind.BEGIN)
             item.children = self.parse_menu_body()
             self.expect(TokenKind.END)
@@ -416,10 +433,10 @@ class _Parser:
             self.advance()
             return MenuItem(text=None, is_separator=True, line=keyword.line)
 
-        text = self.read_joined_string()
+        text, span = self.read_joined_string()
         groups = self.split_arguments(self.read_statement_arguments(keyword.line))
         symbol = _text_of(groups, 0) or None
-        return MenuItem(text=text, symbol=symbol, line=keyword.line)
+        return MenuItem(text=text, symbol=symbol, line=keyword.line, span=span)
 
     # -- statement helpers ----------------------------------------------
 
@@ -494,6 +511,16 @@ def _string_of(groups: list[list[Token]], index: int) -> str | None:
     return None
 
 
+def _span_of(groups: list[list[Token]], index: int) -> tuple[int, int] | None:
+    """Offsets covering the string literals of one argument group."""
+    if index >= len(groups):
+        return None
+    literals = [t for t in groups[index] if t.kind is TokenKind.STRING]
+    if not literals:
+        return None
+    return (literals[0].start, literals[-1].end)
+
+
 def _text_of(groups: list[list[Token]], index: int) -> str:
     if index >= len(groups):
         return ""
@@ -535,7 +562,7 @@ def _styles_from(groups: list[list[Token]], index: int, *, single_group: bool = 
 
 def parse_resource_script(text: str, *, path: str = "<string>") -> ResourceScript:
     """Parse resource script text into a :class:`~.ast.ResourceScript`."""
-    return _Parser(tokenize(text, path=path), path).parse()
+    return _Parser(tokenize(text, path=path), path, text).parse()
 
 
 #: Short alias used by the source registry.

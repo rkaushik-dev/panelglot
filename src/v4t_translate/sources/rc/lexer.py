@@ -117,9 +117,11 @@ def tokenize(text: str, *, path: str | None = None) -> list[Token]:
             continue
 
         if char in "Ll" and cursor.peek(1) == '"':
-            # Wide literal. The L is a storage hint, not part of the text.
+            # Wide literal. The L is a storage hint, not part of the text, but
+            # it is part of the span so a rewrite keeps the prefix.
+            prefix = cursor.pos
             cursor.advance()
-            tokens.append(_read_string(cursor))
+            tokens.append(_read_string(cursor, start=prefix))
             continue
 
         if char in _IDENT_START:
@@ -132,14 +134,17 @@ def tokenize(text: str, *, path: str | None = None) -> list[Token]:
 
         kind = _PUNCTUATION.get(char)
         if kind is not None:
-            line, column = cursor.line, cursor.column
+            line, column, start = cursor.line, cursor.column, cursor.pos
             cursor.advance()
-            tokens.append(Token(kind, char, line, column))
+            tokens.append(Token(kind, char, line, column, start=start, end=cursor.pos))
             continue
 
         raise cursor.fail(f"unexpected character {char!r}")
 
-    tokens.append(Token(TokenKind.EOF, "", cursor.line, cursor.column))
+    tokens.append(
+        Token(TokenKind.EOF, "", cursor.line, cursor.column,
+              start=cursor.pos, end=cursor.pos)
+    )
     return tokens
 
 
@@ -161,7 +166,7 @@ def _skip_block_comment(cursor: _Cursor) -> None:
 
 
 def _read_directive(cursor: _Cursor) -> Token:
-    line, column = cursor.line, cursor.column
+    line, column, start = cursor.line, cursor.column, cursor.pos
     chars: list[str] = []
     while not cursor.at_end():
         char = cursor.peek()
@@ -175,25 +180,28 @@ def _read_directive(cursor: _Cursor) -> Token:
             chars.append(" ")
             continue
         chars.append(cursor.advance())
-    return Token(TokenKind.DIRECTIVE, "".join(chars).strip(), line, column)
+    return Token(TokenKind.DIRECTIVE, "".join(chars).strip(), line, column,
+                 start=start, end=cursor.pos)
 
 
 def _read_identifier(cursor: _Cursor) -> Token:
-    line, column = cursor.line, cursor.column
+    line, column, start = cursor.line, cursor.column, cursor.pos
     chars: list[str] = []
     while not cursor.at_end() and cursor.peek() in _IDENT_BODY:
         chars.append(cursor.advance())
     word = "".join(chars)
     upper = word.upper()
     if upper == "BEGIN":
-        return Token(TokenKind.BEGIN, word, line, column)
-    if upper == "END":
-        return Token(TokenKind.END, word, line, column)
-    return Token(TokenKind.IDENT, word, line, column)
+        kind = TokenKind.BEGIN
+    elif upper == "END":
+        kind = TokenKind.END
+    else:
+        kind = TokenKind.IDENT
+    return Token(kind, word, line, column, start=start, end=cursor.pos)
 
 
 def _read_number(cursor: _Cursor) -> Token:
-    line, column = cursor.line, cursor.column
+    line, column, start = cursor.line, cursor.column, cursor.pos
     chars: list[str] = []
     if cursor.peek() == "0" and cursor.peek(1) in "xX":
         chars.append(cursor.advance())
@@ -201,7 +209,8 @@ def _read_number(cursor: _Cursor) -> Token:
         while not cursor.at_end() and cursor.peek() in "0123456789abcdefABCDEF":
             chars.append(cursor.advance())
         text = "".join(chars)
-        return Token(TokenKind.NUMBER, text, line, column, value=int(text, 16))
+        return Token(TokenKind.NUMBER, text, line, column, value=int(text, 16),
+                     start=start, end=cursor.pos)
 
     while not cursor.at_end() and cursor.peek() in _DIGITS:
         chars.append(cursor.advance())
@@ -209,11 +218,17 @@ def _read_number(cursor: _Cursor) -> Token:
     while not cursor.at_end() and cursor.peek() in "lLuU":
         cursor.advance()
     text = "".join(chars)
-    return Token(TokenKind.NUMBER, text, line, column, value=int(text))
+    return Token(TokenKind.NUMBER, text, line, column, value=int(text),
+                 start=start, end=cursor.pos)
 
 
-def _read_string(cursor: _Cursor) -> Token:
+def _read_string(cursor: _Cursor, *, start: int | None = None) -> Token:
     line, column = cursor.line, cursor.column
+    if start is None:
+        start = cursor.pos
+    else:
+        # A wide literal's L was already consumed, so the column has moved on.
+        column -= 1
     cursor.advance()  # opening quote
     raw: list[str] = []
 
@@ -245,7 +260,8 @@ def _read_string(cursor: _Cursor) -> Token:
         raw.append(cursor.advance())
 
     text = "".join(raw)
-    return Token(TokenKind.STRING, text, line, column, value=unescape_rc_string(text))
+    return Token(TokenKind.STRING, text, line, column,
+                 value=unescape_rc_string(text), start=start, end=cursor.pos)
 
 
 def unescape_rc_string(raw: str) -> str:
