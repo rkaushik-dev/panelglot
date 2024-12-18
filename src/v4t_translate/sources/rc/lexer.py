@@ -14,7 +14,7 @@ from __future__ import annotations
 from ...errors import ParseError
 from .tokens import Token, TokenKind
 
-__all__ = ["tokenize", "unescape_rc_string"]
+__all__ = ["tokenize", "unescape_rc_string", "escape_rc_string", "quote_rc_string"]
 
 _SIMPLE_ESCAPES = {
     "a": "\a",
@@ -329,3 +329,36 @@ def unescape_rc_string(raw: str) -> str:
         index += 1
 
     return "".join(out)
+
+
+def escape_rc_string(text: str) -> str:
+    """The inverse of :func:`unescape_rc_string`, for the localised writer.
+
+    Only the four characters that would otherwise change the meaning are
+    escaped. Escaping more than that is not wrong, but it makes the localised
+    file harder to compare with the English one, and somebody does that
+    comparison every release.
+
+    Ampersands are left alone here as well. They arrive from the catalog
+    already meaning what the translator meant.
+    """
+    out: list[str] = []
+    for char in text:
+        if char == "\\":
+            out.append("\\\\")
+        elif char == '"':
+            out.append('\\"')
+        elif char == "\n":
+            out.append("\\n")
+        elif char == "\t":
+            out.append("\\t")
+        elif char == "\r":
+            out.append("\\r")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def quote_rc_string(text: str) -> str:
+    """``escape_rc_string`` with the surrounding quotes."""
+    return f'"{escape_rc_string(text)}"'
