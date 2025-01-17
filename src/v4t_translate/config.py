@@ -29,6 +29,7 @@ __all__ = [
     "CONFIG_FILENAME",
     "SourceEntry",
     "LocaleEntry",
+    "OutputEntry",
     "CheckSettings",
     "ProjectConfig",
     "load_config",
@@ -86,6 +87,32 @@ class LocaleEntry:
 
 
 @dataclass(frozen=True)
+class OutputEntry:
+    """One file the build produces, for one language or for all of them."""
+
+    kind: str
+    path: str
+    """Template. ``{locale}``, ``{language}``, ``{qualifier}`` and ``{project}``
+    are substituted, so one entry covers every language."""
+
+    locales: tuple[str, ...] = ()
+    """Restrict to these languages. Empty means every configured one."""
+
+    source: Path | None = None
+    """The English file to localise, for emitters that rewrite one."""
+
+    encoding: str | None = None
+    fallback_to_source: bool = True
+
+    def applies_to(self, tag: str) -> bool:
+        return not self.locales or tag in self.locales
+
+    def describe(self) -> str:
+        where = ",".join(self.locales) if self.locales else "all"
+        return f"{self.kind} -> {self.path} ({where})"
+
+
+@dataclass(frozen=True)
 class CheckSettings:
     """What ``check`` treats as a failure."""
 
@@ -110,6 +137,7 @@ class ProjectConfig:
     source_locale: Locale
     sources: list[SourceEntry] = field(default_factory=list)
     locales: list[LocaleEntry] = field(default_factory=list)
+    outputs: list[OutputEntry] = field(default_factory=list)
     catalog_dir: Path = Path("catalog")
     workbook_dir: Path = Path("workbooks")
     output_dir: Path = Path("out")
@@ -182,6 +210,7 @@ def _build(raw: dict[str, Any], *, root: Path, origin: str) -> ProjectConfig:
         source_locale=_resolve_locale(project.get("source_locale", "en-US"), origin),
         sources=_sources(raw, origin),
         locales=_locales(raw, origin),
+        outputs=_outputs(raw, origin),
     )
 
     for key, attribute in (("catalog_dir", "catalog_dir"),
@@ -235,6 +264,42 @@ def _sources(raw: dict[str, Any], origin: str) -> list[SourceEntry]:
 
     if not result:
         raise ConfigError(f"{origin}: no [[source]] entries, so there is nothing to read")
+    return result
+
+
+def _outputs(raw: dict[str, Any], origin: str) -> list[OutputEntry]:
+    entries = raw.get("output", [])
+    if isinstance(entries, dict):
+        entries = [entries]
+    if not isinstance(entries, list):
+        raise ConfigError(f"{origin}: [[output]] must be a list of tables")
+
+    result: list[OutputEntry] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise ConfigError(f"{origin}: output {index} is not a table")
+
+        kind = entry.get("kind")
+        path = entry.get("path")
+        if not isinstance(kind, str) or not isinstance(path, str):
+            raise ConfigError(f"{origin}: output {index} needs a 'kind' and a 'path'")
+
+        locales = entry.get("locales", entry.get("locale", []))
+        if isinstance(locales, str):
+            locales = [locales]
+
+        source = entry.get("source")
+        result.append(
+            OutputEntry(
+                kind=kind,
+                path=path,
+                locales=tuple(_resolve_locale(t, origin).tag for t in locales),
+                source=Path(str(source)) if source else None,
+                encoding=entry.get("encoding"),
+                fallback_to_source=bool(entry.get("fallback", True)),
+            )
+        )
+
     return result
 
 
