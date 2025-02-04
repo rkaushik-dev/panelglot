@@ -22,6 +22,7 @@ from .errors import CheckFailed, V4TError
 from .ops.build import BuildResult, build_project, check_before_build
 from .ops.check import check_project
 from .ops.extract import ExtractResult, extract_project
+from .ops.pretranslate import pretranslate_project
 from .ops.sync import ImportResult, export_workbooks, import_workbook
 from .report.console import DEFAULT_LIMIT, format_check
 
@@ -118,6 +119,37 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
             error_count=len(result.report.errors),
             warning_count=len(result.report.warnings),
         )
+
+
+@main.command()
+@click.argument("locale")
+@click.option("--provider", "-p",
+              help="Machine translation provider for what memory cannot fill. "
+                   "Built in: passthrough, pseudo.")
+@click.option("--trust-memory", is_flag=True,
+              help="Land exact memory hits as approved rather than needs-review.")
+@click.option("--threshold", type=float, default=0.75, show_default=True,
+              help="How close a fuzzy memory match has to be.")
+@click.option("--dry-run", is_flag=True, help="Report what would change, write nothing.")
+@pass_context
+def pretranslate(context: Context, locale: str, provider: str | None,
+                 trust_memory: bool, threshold: float, dry_run: bool) -> None:
+    """Fill one language from translation memory, and optionally a provider."""
+    result = pretranslate_project(
+        context.config, locale, provider=provider, trust_memory=trust_memory,
+        threshold=threshold, dry_run=dry_run,
+    )
+
+    for warning in result.warnings:
+        context.warn(warning)
+
+    context.say(result.summary())
+
+    for key in result.from_fuzzy:
+        context.say(f"  fuzzy {key}", level=1)
+
+    if dry_run:
+        context.say("dry run, nothing written")
 
 
 @main.command()
