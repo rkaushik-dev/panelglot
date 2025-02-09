@@ -23,6 +23,7 @@ from .ops.build import BuildResult, build_project, check_before_build
 from .ops.check import check_project
 from .ops.extract import ExtractResult, extract_project
 from .ops.pretranslate import pretranslate_project
+from .ops.stats import project_stats
 from .ops.sync import ImportResult, export_workbooks, import_workbook
 from .report.console import DEFAULT_LIMIT, format_check
 
@@ -119,6 +120,28 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
             error_count=len(result.report.errors),
             warning_count=len(result.report.warnings),
         )
+
+
+@main.command()
+@click.option("--locale", "-l", "locales", multiple=True,
+              help="Only this language. Repeatable.")
+@click.option("--worst-first", is_flag=True,
+              help="Order by how far behind each language is.")
+@pass_context
+def stats(context: Context, locales: tuple[str, ...], worst_first: bool) -> None:
+    """Report how far along each language is."""
+    result = project_stats(context.config, locales=list(locales) or None)
+
+    context.say(result.summary())
+    if result.protected:
+        context.say(f"{result.protected} messages are protected", level=1)
+
+    ordered = result.worst_first() if worst_first else result.locales
+    for locale_stats in ordered:
+        context.say(f"  {locale_stats.describe()}")
+        for state, count in locale_stats.by_state.items():
+            if count:
+                context.say(f"      {state}: {count}", level=1)
 
 
 @main.command()
