@@ -22,7 +22,20 @@ from .protocol import ProtocolRule
 from .punctuation import PunctuationRule, WhitespaceRule
 from .result import Finding, Severity
 
-__all__ = ["ALL_RULES", "rule_names", "build_rules", "SeverityOverride"]
+__all__ = [
+    "ALL_RULES",
+    "ANALYSIS_RULES",
+    "rule_names",
+    "known_rule_names",
+    "build_rules",
+    "SeverityOverride",
+]
+
+#: Names that are not rules but can be disabled like one. These are the
+#: whole-language analyses in :mod:`v4t_translate.ops.analysis`, which cannot
+#: be Rules because a Rule only ever sees one message. They still have to be
+#: nameable in config, or "disable = [collisions]" would be rejected.
+ANALYSIS_RULES: tuple[str, ...] = ("collisions",)
 
 #: Every rule, worst consequence first.
 ALL_RULES: tuple[type, ...] = (
@@ -74,16 +87,21 @@ def rule_names() -> list[str]:
     return [cls.name for cls in ALL_RULES]
 
 
+def known_rule_names() -> list[str]:
+    """Everything a project may name in disable, promote or demote."""
+    return [*rule_names(), *ANALYSIS_RULES]
+
+
 def build_rules(settings: CheckSettings | None = None) -> list[Rule]:
     """Instantiate the rules a project should run, in report order."""
     settings = settings or CheckSettings()
-    known = set(rule_names())
+    known = set(known_rule_names())
 
     for name in (*settings.disabled_rules, *settings.promoted_rules,
                  *settings.demoted_rules):
         if name not in known:
             raise ConfigError(
-                f"unknown rule {name!r}. Known rules: {', '.join(rule_names())}"
+                f"unknown rule {name!r}. Known rules: {', '.join(known_rule_names())}"
             )
 
     overlap = set(settings.promoted_rules) & set(settings.demoted_rules)
