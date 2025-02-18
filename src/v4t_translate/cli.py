@@ -26,6 +26,7 @@ from .ops.pretranslate import pretranslate_project
 from .ops.stats import project_stats
 from .ops.sync import ImportResult, export_workbooks, import_workbook
 from .report.console import DEFAULT_LIMIT, format_check
+from .report.structured import check_to_json, report_to_junit
 
 __all__ = ["main"]
 
@@ -99,9 +100,14 @@ def extract(context: Context, dry_run: bool, keep_going: bool) -> None:
 @click.option("--no-detail", is_flag=True, help="One line per finding.")
 @click.option("--fail-on", type=click.Choice(["error", "warning", "never"]),
               help="Override the project's fail_on setting.")
+@click.option("--format", "output_format",
+              type=click.Choice(["text", "json", "junit"]), default="text",
+              show_default=True, help="How to print the findings.")
+@click.option("--output", "-o", type=click.Path(dir_okay=False, path_type=Path),
+              help="Write the report here instead of to the terminal.")
 @pass_context
 def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: bool,
-          fail_on: str | None) -> None:
+          fail_on: str | None, output_format: str, output: Path | None) -> None:
     """Run every rule over the translated catalog."""
     config = context.config
     result = check_project(config, locales=list(locales) or None)
@@ -109,8 +115,14 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
     for warning in result.warnings:
         context.warn(warning)
 
-    if not context.quiet:
-        click.echo(format_check(result, limit=limit, show_detail=not no_detail))
+    text = _format_check(result, output_format, limit=limit, detail=not no_detail)
+
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+        context.say(f"wrote {output}", level=1)
+    elif not context.quiet:
+        click.echo(text)
 
     threshold = fail_on or config.check.fail_on
     if result.should_fail(threshold):
@@ -120,6 +132,14 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
             error_count=len(result.report.errors),
             warning_count=len(result.report.warnings),
         )
+
+
+def _format_check(result, output_format: str, *, limit: int, detail: bool) -> str:
+    if output_format == "json":
+        return check_to_json(result)
+    if output_format == "junit":
+        return report_to_junit(result.report)
+    return format_check(result, limit=limit, show_detail=detail)
 
 
 @main.command()
