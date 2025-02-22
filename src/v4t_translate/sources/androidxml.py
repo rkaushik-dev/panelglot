@@ -51,11 +51,11 @@ def unescape_android(text: str) -> str:
     """Resolve Android's escaping and its surrounding-quote convention."""
     stripped = text.strip("\n")
 
+    # A quoted value keeps its whitespace exactly. An unquoted one has its
+    # whitespace collapsed, which is what the platform does and what makes a
+    # caption the developer wrapped over two source lines come out as one.
     quoted = len(stripped) >= 2 and stripped[0] == '"' and stripped[-1] == '"'
-    if quoted:
-        stripped = stripped[1:-1]
-    else:
-        stripped = " ".join(stripped.split())
+    stripped = stripped[1:-1] if quoted else " ".join(stripped.split())
 
     out: list[str] = []
     index = 0

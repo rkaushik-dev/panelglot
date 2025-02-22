@@ -232,7 +232,8 @@ def _unescape(literal: str) -> str:
             if escape == "x":
                 index += 1
                 digits = ""
-                while index < len(piece) and len(digits) < 2 and piece[index] in "0123456789abcdefABCDEF":
+                while (index < len(piece) and len(digits) < 2
+                       and piece[index] in "0123456789abcdefABCDEF"):
                     digits += piece[index]
                     index += 1
                 out.append(chr(int(digits, 16)) if digits else "x")

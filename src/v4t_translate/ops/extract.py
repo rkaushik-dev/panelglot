@@ -16,7 +16,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..catalog.merge import MergeReport, carry_translations, merge_catalog
-from ..catalog.store import Catalog, load_catalog, load_translations, save_catalog, save_translations
+from ..catalog.store import (
+    Catalog,
+    load_catalog,
+    load_translations,
+    save_catalog,
+    save_translations,
+)
 from ..config import ProjectConfig, SourceEntry
 from ..errors import SourceError
 from ..sources.base import Extraction, SourceOptions, merge_extractions

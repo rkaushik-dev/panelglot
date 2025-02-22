@@ -15,6 +15,7 @@ thing that catches it.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
@@ -152,13 +153,17 @@ class TranslationSet:
             tally[translation.state.value] += 1
         return tally
 
-    def restrict_to(self, keys: set[str]) -> list[str]:
+    def restrict_to(self, keys: Iterable[str]) -> list[str]:
         """Drop entries whose message no longer exists. Returns what went.
 
         Called after an extraction, so the catalog does not accumulate
         translations for dialogs that were deleted three releases ago.
+
+        Takes any iterable rather than a set. Inside this class the name
+        ``set`` is the method below, so a ``set[str]`` annotation resolves to
+        that and means nothing.
         """
-        gone = sorted(set(self.entries) - keys)
+        gone = sorted(self.entries.keys() - frozenset(keys))
         for key in gone:
             del self.entries[key]
         return gone

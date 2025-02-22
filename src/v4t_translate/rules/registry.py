@@ -7,7 +7,8 @@ ones that break the display, to the ones that are about consistency.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
+from typing import Protocol
 
 from ..config import CheckSettings
 from ..errors import ConfigError
@@ -37,8 +38,23 @@ __all__ = [
 #: nameable in config, or "disable = [collisions]" would be rejected.
 ANALYSIS_RULES: tuple[str, ...] = ("collisions",)
 
+class RuleType(Protocol):
+    """The class object of a rule.
+
+    Separate from :class:`~.base.Rule` because the registry reads ``name`` off
+    the class, before anything is instantiated, and a Protocol describing an
+    instance does not say that the class has it too.
+    """
+
+    name: str
+    default_severity: Severity
+
+    def __call__(self) -> Rule:
+        ...
+
+
 #: Every rule, worst consequence first.
-ALL_RULES: tuple[type, ...] = (
+ALL_RULES: tuple[RuleType, ...] = (
     PlaceholderRule,   # crashes the HMI
     ProtocolRule,      # takes the serial link down
     EncodingRule,      # ships as question marks

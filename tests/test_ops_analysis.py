@@ -1,4 +1,3 @@
-import pytest
 
 from v4t_translate.catalog.ids import message_key
 from v4t_translate.catalog.model import Message, Origin, OriginKind

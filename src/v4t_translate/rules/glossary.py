@@ -18,7 +18,7 @@ Matching in the source is a word match, because "pen" has to not fire on
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation

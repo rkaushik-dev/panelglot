@@ -115,7 +115,7 @@ def wrap(text: str, font: FontMetrics, width_px: int) -> list[str]:
     invented ones.
     """
     if width_px <= 0:
-        return [line for line in drawn_text(text).split("\n")]
+        return drawn_text(text).split("\n")
 
     lines: list[str] = []
     for paragraph in drawn_text(text).split("\n"):

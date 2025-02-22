@@ -12,8 +12,8 @@ font, which is why :class:`Dialog` carries that too.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 __all__ = [
     "Control",

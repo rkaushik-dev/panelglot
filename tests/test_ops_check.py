@@ -186,5 +186,7 @@ def test_should_fail_follows_the_setting(project):
 
 
 def test_an_unconfigured_locale_is_rejected(project):
-    with pytest.raises(Exception):
+    from v4t_translate.errors import ConfigError
+
+    with pytest.raises(ConfigError, match="is not configured"):
         check_project(project, locales=["fr-FR"])

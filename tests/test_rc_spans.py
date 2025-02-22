@@ -5,6 +5,8 @@ whitespace change in the fixture, so every test here slices the source with
 the span and checks what it got.
 """
 
+from itertools import pairwise
+
 import pytest
 
 from v4t_translate.sources.rc.lexer import tokenize
@@ -137,5 +139,5 @@ def test_spans_do_not_overlap(script):
             spans.append(entry.span)
 
     spans.sort()
-    for earlier, later in zip(spans, spans[1:]):
+    for earlier, later in pairwise(spans):
         assert earlier[1] <= later[0]

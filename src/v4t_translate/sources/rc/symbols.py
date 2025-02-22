@@ -169,7 +169,7 @@ def _evaluate(body: str, table: SymbolTable) -> int | None:
         return None
 
     try:
-        result = eval(expression, {"__builtins__": {}}, {})  # noqa: S307
+        result = eval(expression, {"__builtins__": {}}, {})
     except (SyntaxError, NameError, TypeError, ZeroDivisionError):
         return None
 

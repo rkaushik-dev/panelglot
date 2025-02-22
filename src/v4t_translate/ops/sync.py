@@ -23,7 +23,7 @@ from pathlib import Path
 
 from ..catalog.ids import normalize_source
 from ..catalog.store import Catalog, load_catalog, load_translations, save_translations
-from ..catalog.translations import Translation, TranslationSet, TranslationState
+from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
 from ..errors import CatalogError, WorkbookError
 from ..locales import Locale

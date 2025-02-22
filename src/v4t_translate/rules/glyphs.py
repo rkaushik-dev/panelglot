@@ -18,7 +18,7 @@ answer is "this language cannot ship on this panel", not "fix the string".
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation

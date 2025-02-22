@@ -256,16 +256,18 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
 
-    handle = tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", newline="\n", dir=path.parent,
-        prefix=path.name + ".", suffix=".tmp", delete=False,
+    # mkstemp rather than NamedTemporaryFile: the file has to outlive the
+    # handle so it can be renamed into place, and delete=False on the latter
+    # reads as an oversight every time somebody edits this.
+    descriptor, scratch = tempfile.mkstemp(
+        dir=path.parent, prefix=path.name + ".", suffix=".tmp"
     )
     try:
-        with handle:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(text)
-        os.replace(handle.name, path)
+        os.replace(scratch, path)
     except BaseException:
-        Path(handle.name).unlink(missing_ok=True)
+        Path(scratch).unlink(missing_ok=True)
         raise
 
 

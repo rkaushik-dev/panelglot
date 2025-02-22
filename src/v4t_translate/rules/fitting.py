@@ -24,7 +24,7 @@ is a thing to look at rather than a thing to fail the build on.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation

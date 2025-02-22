@@ -177,7 +177,7 @@ def _fill_from_provider(catalog: Catalog, translations: TranslationSet,
             result.left_empty.extend(batch)
             continue
 
-        for key, text in zip(batch, answer.texts):
+        for key, text in zip(batch, answer.texts, strict=False):
             if not text:
                 result.left_empty.append(key)
                 continue

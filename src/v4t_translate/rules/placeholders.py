@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation

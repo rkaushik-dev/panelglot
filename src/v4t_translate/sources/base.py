@@ -8,6 +8,7 @@ would happily grow to swallow the whole pipeline if nothing stopped it.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -40,10 +41,11 @@ class SourceOptions:
         """Path as it should appear in an origin: relative, forward slashes."""
         target = path or self.path
         if self.root is not None:
-            try:
+            # A source outside the project root keeps its absolute path. That
+            # happens whenever a sibling checkout is somewhere unexpected, and
+            # an absolute origin is better than a wrong relative one.
+            with contextlib.suppress(ValueError):
                 target = target.relative_to(self.root)
-            except ValueError:
-                pass
         return target.as_posix()
 
 

@@ -115,7 +115,7 @@ def clean_cell(value: object) -> str:
         # certainly typed without a decimal point.
         return str(int(value)) if value.is_integer() else repr(value)
 
-    if isinstance(value, (dt.datetime, dt.date, dt.time)):
+    if isinstance(value, dt.datetime | dt.date | dt.time):
         return value.isoformat()
 
     text = str(value)

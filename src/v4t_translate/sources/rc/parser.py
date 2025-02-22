@@ -267,10 +267,11 @@ class _Parser:
         dialog = Dialog(symbol=name, statement=statement.text.upper(), line=statement.line)
 
         geometry = self.read_line_numbers(statement.line)
-        for attribute, value in zip(("x", "y", "width", "height"), geometry):
+        for attribute, value in zip(("x", "y", "width", "height"), geometry, strict=False):
             setattr(dialog, attribute, value)
 
-        while self.current.kind is TokenKind.IDENT and self.current.text.upper() in _DIALOG_ATTRIBUTES:
+        while (self.current.kind is TokenKind.IDENT
+               and self.current.text.upper() in _DIALOG_ATTRIBUTES):
             self.parse_dialog_attribute(dialog)
 
         self.expect(TokenKind.BEGIN)
@@ -473,14 +474,14 @@ class _Parser:
             return False
         if token.kind is not TokenKind.IDENT:
             return True
+        # Anything else is a bare identifier on its own line inside a dialog,
+        # which is a style token that wrapped, so keep reading.
         upper = token.text.upper()
-        if upper in _CONTROL_STATEMENTS or upper in _DIALOG_ATTRIBUTES:
-            return True
-        if upper in ("MENUITEM", "POPUP", "STRINGTABLE"):
-            return True
-        # A bare identifier on its own line inside a dialog is a style token
-        # that wrapped, so keep reading.
-        return False
+        return (
+            upper in _CONTROL_STATEMENTS
+            or upper in _DIALOG_ATTRIBUTES
+            or upper in ("MENUITEM", "POPUP", "STRINGTABLE")
+        )
 
     @staticmethod
     def split_arguments(tokens: list[Token]) -> list[list[Token]]:

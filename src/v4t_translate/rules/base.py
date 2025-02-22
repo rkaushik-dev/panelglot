@@ -9,8 +9,9 @@ and those live in ops.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation

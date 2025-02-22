@@ -9,8 +9,8 @@ from v4t_translate.mt.base import (
     restore_placeholders,
 )
 from v4t_translate.mt.providers import (
-    PseudoProvider,
     PassthroughProvider,
+    PseudoProvider,
     get_provider,
     register_provider,
 )
