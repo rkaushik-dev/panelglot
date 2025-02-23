@@ -1,0 +1,106 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUTF8: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - run: python -m pip install -e ".[dev]"
+
+      - name: ruff
+        run: ruff check --output-format=github .
+
+      - name: mypy
+        run: mypy src/v4t_translate
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+        include:
+          # The tool is run on the panel build machines, which are Windows,
+          # and the encoding and path handling only ever break there.
+          - os: windows-latest
+            python-version: "3.12"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - run: python -m pip install -e ".[dev]"
+
+      - name: pytest
+        run: >-
+          pytest
+          --junitxml=reports/pytest-${{ matrix.os }}-${{ matrix.python-version }}.xml
+          --cov=v4t_translate
+          --cov-report=term-missing:skip-covered
+          --cov-report=xml:reports/coverage.xml
+
+      - name: upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.os }}-${{ matrix.python-version }}
+          path: reports/
+          if-no-files-found: ignore
+
+  selfcheck:
+    # The tool has to be able to check its own worked example, because that
+    # config is what everybody copies and a broken one costs a day each time.
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - run: python -m pip install -e ".[dev]"
+
+      - name: the console script is installed and runs
+        run: v4t-translate --version
+
+      - name: every command has help
+        run: |
+          for command in extract check export import build pretranslate stats; do
+            v4t-translate "$command" --help > /dev/null
+          done
+
+      - name: the worked example config parses
+        run: >-
+          python -c "from v4t_translate.config import load_config;
+          c = load_config('v4t-translate.toml');
+          print(c.name, c.target_tags())"
