@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ...errors import ParseError
+from .expressions import ExpressionError, evaluate_expression
 
 __all__ = ["SymbolTable", "parse_resource_header", "load_resource_header", "STANDARD_IDS"]
 
@@ -44,7 +45,7 @@ _DEFINE = re.compile(
 )
 _TRAILING_COMMENT = re.compile(r"(//.*|/\*.*?\*/)\s*$")
 _SIMPLE_INT = re.compile(r"^[-+]?(0[xX][0-9a-fA-F]+|\d+)[uUlL]*$")
-_ARITHMETIC = re.compile(r"^[\s()+\-*/0-9A-Za-z_xX]+$")
+_INT_SUFFIX = re.compile(r"[uUlL]+$")
 
 
 @dataclass
@@ -146,31 +147,15 @@ def load_resource_header(path: str | Path, *, encoding: str = "utf-8-sig") -> Sy
 def _evaluate(body: str, table: SymbolTable) -> int | None:
     """Resolve a define body to an int, or ``None`` when it is not a number.
 
-    Handles the three forms that actually turn up: a literal, a reference to
-    another symbol, and small arithmetic such as ``(IDC_PEN_BASE + 3)``. String
-    and macro defines are skipped rather than treated as an error, because a
-    resource header is allowed to contain them.
+    Handles the forms that turn up: a literal, a reference to another symbol,
+    and small arithmetic such as ``(IDC_PEN_BASE + 3)``. String and macro
+    defines are skipped rather than treated as an error, because a resource
+    header is allowed to contain them and every one of ours does.
     """
     if _SIMPLE_INT.match(body):
-        return int(body.rstrip("uUlL"), 0)
-
-    if body in table.values:
-        return table.values[body]
-
-    if not _ARITHMETIC.match(body):
-        return None
-
-    expression = body
-    for name in sorted(table.values, key=len, reverse=True):
-        if name in expression:
-            expression = re.sub(rf"\b{re.escape(name)}\b", str(table.values[name]), expression)
-
-    if re.search(r"[A-Za-z_]", expression.replace("0x", "").replace("0X", "")):
-        return None
+        return int(_INT_SUFFIX.sub("", body), 0)
 
     try:
-        result = eval(expression, {"__builtins__": {}}, {})
-    except (SyntaxError, NameError, TypeError, ZeroDivisionError):
+        return evaluate_expression(body, table.values)
+    except ExpressionError:
         return None
-
-    return result if isinstance(result, int) else None

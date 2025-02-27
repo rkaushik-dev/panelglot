@@ -9,10 +9,10 @@ it.
 from __future__ import annotations
 
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
+import tomllib
 from click.testing import CliRunner
 
 import v4t_translate
