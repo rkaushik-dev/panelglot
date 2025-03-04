@@ -21,6 +21,7 @@ from .config import ProjectConfig, load_config
 from .errors import CheckFailed, V4TError
 from .ops.build import BuildResult, build_project, check_before_build
 from .ops.check import check_project
+from .ops.doctor import run_doctor
 from .ops.extract import ExtractResult, extract_project
 from .ops.pretranslate import pretranslate_project
 from .ops.stats import project_stats
@@ -140,6 +141,28 @@ def _format_check(result, output_format: str, *, limit: int, detail: bool) -> st
     if output_format == "junit":
         return report_to_junit(result.report)
     return format_check(result, limit=limit, show_detail=detail)
+
+
+@main.command()
+@click.option("--all", "show_all", is_flag=True,
+              help="List the checks that passed as well.")
+@pass_context
+def doctor(context: Context, show_all: bool) -> None:
+    """Check the project is set up before anything relies on it."""
+    report = run_doctor(context.config)
+
+    for finding in report.findings:
+        if finding.ok and not (show_all or context.verbose):
+            continue
+        context.say(finding.describe())
+
+    context.say(report.summary())
+
+    if report.problems:
+        raise CheckFailed(
+            f"{len(report.problems)} problems with the project setup",
+            error_count=len(report.problems),
+        )
 
 
 @main.command()

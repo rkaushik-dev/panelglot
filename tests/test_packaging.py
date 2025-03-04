@@ -12,8 +12,12 @@ import sys
 from pathlib import Path
 
 import pytest
-import tomllib
 from click.testing import CliRunner
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 import v4t_translate
 from v4t_translate.cli import main
@@ -21,7 +25,9 @@ from v4t_translate.cli import main
 ROOT = Path(__file__).resolve().parents[1]
 
 #: Must match the "for command in ..." line in the selfcheck job.
-CI_COMMANDS = ["extract", "check", "export", "import", "build", "pretranslate", "stats"]
+CI_COMMANDS = [
+    "extract", "check", "export", "import", "build", "pretranslate", "stats", "doctor",
+]
 
 
 @pytest.fixture(scope="module")

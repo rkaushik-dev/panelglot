@@ -95,7 +95,7 @@ jobs:
 
       - name: every command has help
         run: |
-          for command in extract check export import build pretranslate stats; do
+          for command in extract check export import build pretranslate stats doctor; do
             v4t-translate "$command" --help > /dev/null
           done
 
