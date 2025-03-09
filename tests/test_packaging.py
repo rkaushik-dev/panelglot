@@ -26,8 +26,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 #: Must match the "for command in ..." line in the selfcheck job.
 CI_COMMANDS = [
-    "extract", "check", "export", "import", "build", "pretranslate", "stats", "doctor",
+    "extract", "check", "export", "import", "build", "pretranslate", "stats",
+    "doctor", "memory",
 ]
+
+#: Subcommands of the memory group. Checked separately because the selfcheck
+#: job only walks the top level.
+MEMORY_COMMANDS = ["stats", "absorb", "import", "suggest"]
 
 
 @pytest.fixture(scope="module")
@@ -111,6 +116,12 @@ def test_the_workflow_runs_ruff_and_mypy(workflow):
 def test_the_workflow_uploads_reports_even_on_failure(workflow):
     assert "if: always()" in workflow
     assert "upload-artifact" in workflow
+
+
+@pytest.mark.parametrize("command", MEMORY_COMMANDS)
+def test_the_memory_subcommand_exists(command):
+    result = CliRunner().invoke(main, ["memory", command, "--help"])
+    assert result.exit_code == 0
 
 
 def test_the_help_lists_every_command():

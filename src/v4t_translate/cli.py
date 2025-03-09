@@ -23,6 +23,13 @@ from .ops.build import BuildResult, build_project, check_before_build
 from .ops.check import check_project
 from .ops.doctor import run_doctor
 from .ops.extract import ExtractResult, extract_project
+from .ops.memory import (
+    absorb_catalog,
+    absorb_workbook,
+    memory_path,
+    memory_stats,
+    suggest_for,
+)
 from .ops.pretranslate import pretranslate_project
 from .ops.stats import project_stats
 from .ops.sync import ImportResult, export_workbooks, import_workbook
@@ -141,6 +148,71 @@ def _format_check(result, output_format: str, *, limit: int, detail: bool) -> st
     if output_format == "junit":
         return report_to_junit(result.report)
     return format_check(result, limit=limit, show_detail=detail)
+
+
+@main.group()
+def memory() -> None:
+    """Look after the translation memory."""
+
+
+@memory.command("stats")
+@pass_context
+def memory_stats_command(context: Context) -> None:
+    """How many units are in memory, per language."""
+    counts = memory_stats(context.config)
+    if not counts:
+        context.say("memory is empty")
+        return
+    for tag, count in counts.items():
+        context.say(f"{tag}: {count}")
+    context.say(f"{sum(counts.values())} units in {memory_path(context.config)}",
+                level=1)
+
+
+@memory.command("absorb")
+@click.option("--locale", "-l", "locales", multiple=True,
+              help="Only this language. Repeatable.")
+@click.option("--include-drafts", is_flag=True,
+              help="Take needs-review entries too. Usually a bad idea.")
+@pass_context
+def memory_absorb(context: Context, locales: tuple[str, ...],
+                  include_drafts: bool) -> None:
+    """Take everything approved in the catalog into memory."""
+    report = absorb_catalog(context.config, locales=list(locales) or None,
+                            include_drafts=include_drafts)
+    context.say(report.summary())
+
+
+@memory.command("import")
+@click.argument("workbook", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--sheet", help="Sheet name. Defaults to the first one.")
+@pass_context
+def memory_import(context: Context, workbook: Path, sheet: str | None) -> None:
+    """Take a workbook into memory without matching it against the catalog."""
+    report = absorb_workbook(context.config, workbook, sheet=sheet)
+    for warning in report.warnings:
+        context.warn(warning)
+    context.say(report.summary())
+
+
+@memory.command("suggest")
+@click.argument("locale")
+@click.argument("text")
+@click.option("--threshold", type=float, default=0.75, show_default=True)
+@click.option("--limit", type=int, default=5, show_default=True)
+@pass_context
+def memory_suggest(context: Context, locale: str, text: str, threshold: float,
+                   limit: int) -> None:
+    """Ask memory what it already has for a piece of English."""
+    matches = suggest_for(context.config, locale, text, threshold=threshold,
+                          limit=limit)
+    if not matches:
+        context.say("nothing close enough")
+        return
+    for match in matches:
+        context.say(f"{match.score:.0%}  {match.target}")
+        context.say(f"      against {match.source!r} from {match.origin or 'unknown'}",
+                    level=1)
 
 
 @main.command()
