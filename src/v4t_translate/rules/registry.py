@@ -22,6 +22,7 @@ from .protected import ProtectedRule
 from .protocol import ProtocolRule
 from .punctuation import PunctuationRule, WhitespaceRule
 from .result import Finding, Severity
+from .state import StateRule
 
 __all__ = [
     "ALL_RULES",
@@ -60,6 +61,7 @@ ALL_RULES: tuple[RuleType, ...] = (
     EncodingRule,      # ships as question marks
     GlyphRule,         # draws blank
     ProtectedRule,     # ships a translated unit symbol
+    StateRule,         # ships a confident answer to a question that changed
     FittingRule,       # clips
     MnemonicRule,      # loses or invents a shortcut
     PunctuationRule,   # reads wrong

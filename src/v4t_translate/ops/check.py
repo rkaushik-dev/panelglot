@@ -138,10 +138,14 @@ def _check_locale(catalog: Catalog, translations: TranslationSet, context: RuleC
     for key in catalog.sorted_keys():
         message = catalog.messages[key]
         translation = translations.get(key)
-        if not translation.text:
-            continue
 
-        summary.translated += 1
+        if translation.text:
+            summary.translated += 1
+
+        # Every rule runs, including on messages with no translation. The
+        # content rules all return immediately on an empty one, and the state
+        # rule needs to see them: an entry marked approved with nothing in it
+        # is exactly the case that has to be caught.
         for rule in rules:
             report.extend(list(rule.check(message, translation, context)))
 
