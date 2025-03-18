@@ -142,6 +142,7 @@ def test_counts():
         "strings": 3,
         "menus": 1,
         "menu_items": 2,
+        "version_values": 0,
         "raw_blocks": 1,
     }
 

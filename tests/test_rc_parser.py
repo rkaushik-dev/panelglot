@@ -159,16 +159,17 @@ def test_nested_popups(script):
     assert "&Print and Verify" in texts
 
 
-def test_version_and_layout_blocks_land_in_raw(script):
+def test_the_blocks_we_do_not_read_land_in_raw(script):
     statements = {b.statement.upper() for b in script.raw_blocks}
-    assert "VERSIONINFO" in statements
     assert "AFX_DIALOG_LAYOUT" in statements
     assert "ICON" in statements
 
 
 def test_a_raw_block_keeps_something_of_its_text(script):
-    version = next(b for b in script.raw_blocks if b.statement.upper() == "VERSIONINFO")
-    assert "StringFileInfo" in version.text
+    layout = next(b for b in script.raw_blocks
+                  if b.statement.upper() == "AFX_DIALOG_LAYOUT")
+    assert "BEGIN" in layout.text
+    assert "IDD_BARCODE_PROPS" in layout.text
 
 
 def test_unterminated_dialog_is_reported():

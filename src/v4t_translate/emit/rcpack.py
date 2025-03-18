@@ -115,6 +115,11 @@ class RcEmitter:
                 self._one(item.text, item.span, catalog, translations, options,
                           result, out)
 
+        for value in script.version_values():
+            if value.text and value.span:
+                self._one(value.text, value.span, catalog, translations, options,
+                          result, out)
+
     def _one(self, source_text: str, span: tuple[int, int], catalog: Catalog,
              translations: TranslationSet, options: EmitOptions, result: EmitResult,
              out: list[_Replacement]) -> None:

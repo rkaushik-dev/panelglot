@@ -83,6 +83,7 @@ class RcSource:
 
         self._collect_strings(script, source, protected, extraction)
         self._collect_menus(script, source, protected, extraction)
+        self._collect_versions(script, source, protected, extraction)
 
         extraction.stats = script.counts()
         extraction.stats["messages"] = len(extraction.by_key())
@@ -162,6 +163,35 @@ class RcSource:
                 )
             )
 
+    def _collect_versions(self, script: ResourceScript, source: str,
+                          protected: list[re.Pattern[str]],
+                          extraction: Extraction) -> None:
+        """The few version block fields anybody reads.
+
+        FileDescription is what Explorer shows in the details pane, and it is
+        the one string in the version block a customer has ever asked about
+        being in English. CompanyName and LegalCopyright are legal text and
+        are left alone on purpose.
+        """
+        for version in script.versions:
+            for value in version.values:
+                if value.name.lower() not in TRANSLATABLE_VERSION_FIELDS:
+                    continue
+                if _is_boilerplate(value.text):
+                    continue
+
+                message = _message(
+                    value.text,
+                    Origin(source=source, kind=OriginKind.VERSION_INFO,
+                           container=version.symbol, symbol=value.name,
+                           line=value.line),
+                    protected=_matches(value.text, protected),
+                )
+                message.developer_note = (
+                    f"Version block {value.name}. Shown by Explorer, not by the HMI."
+                )
+                extraction.messages.append(message)
+
     def _collect_menus(self, script: ResourceScript, source: str,
                        protected: list[re.Pattern[str]], extraction: Extraction) -> None:
         for menu in script.menus:
@@ -183,6 +213,11 @@ class RcSource:
                         "stay as it is."
                     )
                 extraction.messages.append(message)
+
+
+#: Version block fields a translator should see. Everything else in there is
+#: either a legal string that must not change, a file name, or a number.
+TRANSLATABLE_VERSION_FIELDS = frozenset({"filedescription", "productname", "comments"})
 
 
 def control_text_budget(control: Control, width_px: int) -> int:

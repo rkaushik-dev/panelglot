@@ -25,6 +25,8 @@ from .ast import (
     ResourceScript,
     StringEntry,
     StringTable,
+    VersionInfo,
+    VersionValue,
 )
 from .lexer import tokenize
 from .tokens import (
@@ -143,6 +145,8 @@ class _Parser:
             self.script.dialogs.append(self.parse_dialog(name_token.text, statement))
         elif upper in ("MENU", "MENUEX"):
             self.script.menus.append(self.parse_menu(name_token.text, statement))
+        elif upper == "VERSIONINFO":
+            self.script.versions.append(self.parse_version(name_token.text, statement))
         else:
             self.script.raw_blocks.append(self.skip_resource(name_token.text, statement))
 
@@ -198,6 +202,63 @@ class _Parser:
                 if depth == 0:
                     return " ".join(pieces)
         raise self.fail("unterminated BEGIN block")
+
+    # -- version info ---------------------------------------------------
+
+    def parse_version(self, name: str, statement: Token) -> VersionInfo:
+        """Read a ``VERSIONINFO`` for its string values.
+
+        The numeric header lines are skipped without being understood, and so
+        is ``VarFileInfo``, whose ``VALUE "Translation", 0x409, 1200`` looks
+        like a string value and is a pair of numbers.
+        """
+        version = VersionInfo(symbol=name, line=statement.line)
+
+        while not self.at_end() and self.current.kind is not TokenKind.BEGIN:
+            if self.starts_top_level_resource(self.current) and \
+                    self.current.line != statement.line:
+                return version
+            self.advance()
+
+        self.expect(TokenKind.BEGIN)
+        self.parse_version_body(version)
+        self.expect(TokenKind.END)
+        return version
+
+    def parse_version_body(self, version: VersionInfo) -> None:
+        while self.current.kind is not TokenKind.END:
+            if self.at_end():
+                raise self.fail(f"unterminated VERSIONINFO {version.symbol}")
+
+            token = self.advance()
+
+            if token.is_ident("BLOCK"):
+                self.read_joined_string()
+                self.expect(TokenKind.BEGIN)
+                self.parse_version_body(version)
+                self.expect(TokenKind.END)
+                continue
+
+            if not token.is_ident("VALUE"):
+                continue
+
+            name, _ = self.read_joined_string()
+            if self.accept_comma() and self.current.kind is TokenKind.STRING:
+                text, span = self.read_joined_string()
+                version.values.append(
+                    VersionValue(name=name, text=text, line=token.line, span=span)
+                )
+                continue
+
+            # A numeric value. Skip the rest of its line.
+            while not self.at_end() and self.current.line == token.line:
+                self.advance()
+
+    def accept_comma(self) -> bool:
+        if self.current.kind is TokenKind.COMMA:
+            self.advance()
+            return True
+        return False
 
     # -- string tables --------------------------------------------------
 

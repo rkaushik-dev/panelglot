@@ -22,6 +22,8 @@ __all__ = [
     "Menu",
     "StringEntry",
     "StringTable",
+    "VersionValue",
+    "VersionInfo",
     "RawBlock",
     "ResourceScript",
 ]
@@ -161,6 +163,38 @@ class Menu:
 
 
 @dataclass
+class VersionValue:
+    """One ``VALUE "name", "text"`` inside a version block."""
+
+    name: str
+    text: str
+    line: int = 0
+    span: tuple[int, int] | None = None
+
+
+@dataclass
+class VersionInfo:
+    """A ``VERSIONINFO`` resource, reduced to its string values.
+
+    The numeric fields are left in the raw text. Only ``StringFileInfo``
+    carries anything a person reads, and only some of that: the company name
+    and the copyright are legal text that a translator must not touch, while
+    the file description is what Explorer shows in the details pane and is
+    the one string in here anybody has ever complained about being English.
+    """
+
+    symbol: str
+    values: list[VersionValue] = field(default_factory=list)
+    line: int = 0
+
+    def value(self, name: str) -> VersionValue | None:
+        for entry in self.values:
+            if entry.name.lower() == name.lower():
+                return entry
+        return None
+
+
+@dataclass
 class RawBlock:
     """A resource we do not read, kept verbatim.
 
@@ -183,6 +217,7 @@ class ResourceScript:
     dialogs: list[Dialog] = field(default_factory=list)
     string_tables: list[StringTable] = field(default_factory=list)
     menus: list[Menu] = field(default_factory=list)
+    versions: list[VersionInfo] = field(default_factory=list)
     raw_blocks: list[RawBlock] = field(default_factory=list)
     directives: list[str] = field(default_factory=list)
     language: str | None = None
@@ -218,5 +253,10 @@ class ResourceScript:
             "strings": sum(len(t.entries) for t in self.string_tables),
             "menus": len(self.menus),
             "menu_items": sum(1 for _ in self.menu_items()),
+            "version_values": sum(len(v.values) for v in self.versions),
             "raw_blocks": len(self.raw_blocks),
         }
+
+    def version_values(self) -> Iterator[VersionValue]:
+        for version in self.versions:
+            yield from version.values
