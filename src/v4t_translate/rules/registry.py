@@ -13,6 +13,7 @@ from typing import Protocol
 from ..config import CheckSettings
 from ..errors import ConfigError
 from .base import Rule, RuleContext
+from .direction import DirectionRule
 from .fitting import FittingRule
 from .glossary import GlossaryRule
 from .glyphs import EncodingRule, GlyphRule
@@ -64,6 +65,7 @@ ALL_RULES: tuple[RuleType, ...] = (
     StateRule,         # ships a confident answer to a question that changed
     FittingRule,       # clips
     MnemonicRule,      # loses or invents a shortcut
+    DirectionRule,     # draws its punctuation at the wrong end of the line
     PunctuationRule,   # reads wrong
     WhitespaceRule,    # joins wrong
     GlossaryRule,      # says the same thing two ways

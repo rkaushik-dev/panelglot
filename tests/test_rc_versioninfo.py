@@ -89,7 +89,7 @@ def test_a_file_name_is_not_a_message(messages):
 
 
 def test_the_translatable_field_list_is_what_it_says():
-    assert TRANSLATABLE_VERSION_FIELDS == {"filedescription", "productname", "comments"}
+    assert {"filedescription", "productname", "comments"} == TRANSLATABLE_VERSION_FIELDS
 
 
 def test_the_origin_names_the_field(messages):
