@@ -25,6 +25,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from ..catalog.store import Catalog
 from ..catalog.translations import TranslationSet, TranslationState
 from ..locales import Locale
+from .instructions import write_instructions
 from .schema import Column
 from .styles import (
     COLUMN_WIDTHS,
@@ -73,12 +74,16 @@ def write_workbook(
     locale: Locale,
     *,
     only_outstanding: bool = False,
+    with_instructions: bool = True,
 ) -> int:
     """Write the sheet for one language. Returns how many rows it holds.
 
     ``only_outstanding`` drops everything already approved, which is what you
     send for a follow-up round. The key column is what lets the result be
     merged back into the full set.
+
+    The instructions sheet goes second, so the translation sheet is the one
+    that opens. Putting it first was tried and people closed the file.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,6 +106,10 @@ def write_workbook(
         written += 1
 
     _finish(sheet, written)
+
+    if with_instructions:
+        write_instructions(book, locale, catalog.project)
+
     book.save(path)
     return written
 
