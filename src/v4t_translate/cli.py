@@ -21,6 +21,7 @@ from .config import ProjectConfig, load_config
 from .errors import CheckFailed, V4TError
 from .ops.build import BuildResult, build_project, check_before_build
 from .ops.check import check_project
+from .ops.diff import diff_against, outstanding_after
 from .ops.doctor import run_doctor
 from .ops.extract import ExtractResult, extract_project
 from .ops.memory import (
@@ -148,6 +149,29 @@ def _format_check(result, output_format: str, *, limit: int, detail: bool) -> st
     if output_format == "junit":
         return report_to_junit(result.report)
     return format_check(result, limit=limit, show_detail=detail)
+
+
+@main.command()
+@click.argument("previous",
+                type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--locale", "-l", help="Also report what is still unanswered here.")
+@pass_context
+def diff(context: Context, previous: Path, locale: str | None) -> None:
+    """Say what changed since a saved copy of the catalog."""
+    result = diff_against(context.config, previous)
+
+    for message in result.added:
+        context.say(f"  new      {message.source_text!r}")
+    for change in result.changed:
+        context.say(f"  changed  {change.describe()}")
+    for message in result.removed:
+        context.say(f"  gone     {message.source_text!r}", level=1)
+
+    context.say(result.summary())
+
+    if locale is not None:
+        outstanding = outstanding_after(context.config, result, locale)
+        context.say(f"{locale}: {len(outstanding)} of those are still unanswered")
 
 
 @main.group()
