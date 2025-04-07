@@ -35,6 +35,7 @@ from .ops.pretranslate import pretranslate_project
 from .ops.stats import project_stats
 from .ops.sync import ImportResult, export_workbooks, import_workbook
 from .report.console import DEFAULT_LIMIT, format_check
+from .report.html import render_report
 from .report.structured import check_to_json, report_to_junit
 
 __all__ = ["main"]
@@ -110,7 +111,7 @@ def extract(context: Context, dry_run: bool, keep_going: bool) -> None:
 @click.option("--fail-on", type=click.Choice(["error", "warning", "never"]),
               help="Override the project's fail_on setting.")
 @click.option("--format", "output_format",
-              type=click.Choice(["text", "json", "junit"]), default="text",
+              type=click.Choice(["text", "json", "junit", "html"]), default="text",
               show_default=True, help="How to print the findings.")
 @click.option("--output", "-o", type=click.Path(dir_okay=False, path_type=Path),
               help="Write the report here instead of to the terminal.")
@@ -124,7 +125,8 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
     for warning in result.warnings:
         context.warn(warning)
 
-    text = _format_check(result, output_format, limit=limit, detail=not no_detail)
+    text = _format_check(result, output_format, limit=limit, detail=not no_detail,
+                         config=config)
 
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -143,11 +145,16 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
         )
 
 
-def _format_check(result, output_format: str, *, limit: int, detail: bool) -> str:
+def _format_check(result, output_format: str, *, limit: int, detail: bool,
+                  config: ProjectConfig) -> str:
     if output_format == "json":
         return check_to_json(result)
     if output_format == "junit":
         return report_to_junit(result.report)
+    if output_format == "html":
+        # Coverage numbers are a separate pass. The HTML report is the one
+        # place a person compares languages, so it is worth the second read.
+        return render_report(result, project_stats(config))
     return format_check(result, limit=limit, show_detail=detail)
 
 
