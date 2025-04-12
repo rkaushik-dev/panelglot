@@ -1,0 +1,40 @@
+"""One module per command, or per group of closely related ones.
+
+The list below is the order they appear in ``--help``, which is roughly the
+order somebody does them in: extract, check, send, receive, build. Click sorts
+alphabetically on its own and that put build first, which is the last thing
+anybody runs.
+"""
+
+from __future__ import annotations
+
+import click
+
+from .build import build
+from .check import check
+from .extract import extract
+from .inspect import diff, doctor, stats
+from .sync import export, import_
+from .translate import memory, pretranslate
+
+__all__ = ["COMMANDS", "register"]
+
+#: Commands in the order a person meets them.
+COMMANDS: tuple[click.Command, ...] = (
+    extract,
+    check,
+    export,
+    import_,
+    pretranslate,
+    build,
+    stats,
+    diff,
+    doctor,
+    memory,
+)
+
+
+def register(group: click.Group) -> None:
+    """Attach every command to ``group``."""
+    for command in COMMANDS:
+        group.add_command(command)
