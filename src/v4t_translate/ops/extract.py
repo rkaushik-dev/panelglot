@@ -12,9 +12,11 @@ against a checkout somebody else is editing.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..catalog.cache import ExtractionCache, fingerprint_file
 from ..catalog.merge import MergeReport, carry_translations, merge_catalog
 from ..catalog.store import (
     Catalog,
@@ -42,6 +44,9 @@ class ExtractResult:
     skipped: list[str] = field(default_factory=list)
     """Sources that could not be read, with the reason."""
 
+    cache_summary: str = ""
+    """How much of the run came out of the cache."""
+
     @property
     def warnings(self) -> list[str]:
         return [w for extraction in self.extractions for w in extraction.warnings]
@@ -54,11 +59,17 @@ class ExtractResult:
         return {extraction.source: dict(extraction.stats) for extraction in self.extractions}
 
 
+def cache_path(config: ProjectConfig) -> Path:
+    """Where the extraction cache lives."""
+    return config.root / config.catalog_dir / ".extraction-cache.json"
+
+
 def extract_project(
     config: ProjectConfig,
     *,
     dry_run: bool = False,
     keep_going: bool = False,
+    use_cache: bool = True,
 ) -> ExtractResult:
     """Extract every configured source and update the catalog on disk.
 
@@ -66,13 +77,19 @@ def extract_project(
     :attr:`ExtractResult.skipped` instead of an exception. Useful when one of
     the sibling checkouts is not present, which on a developer machine is most
     of the time.
+
+    ``use_cache`` skips re-parsing a source whose content has not changed.
+    Turn it off to prove that a result came from the files rather than from
+    something remembered, which is worth doing before believing a surprise.
     """
+    cache = ExtractionCache.load(cache_path(config)) if use_cache else ExtractionCache()
+
     extractions: list[Extraction] = []
     skipped: list[str] = []
 
     for entry in config.sources:
         try:
-            extractions.append(_read_one(config, entry))
+            extractions.append(_read_one(config, entry, cache))
         except SourceError as exc:
             if not keep_going:
                 raise
@@ -84,13 +101,18 @@ def extract_project(
     catalog, report = merge_catalog(existing, extracted)
 
     result = ExtractResult(
-        catalog=catalog, report=report, extractions=extractions, skipped=skipped
+        catalog=catalog, report=report, extractions=extractions, skipped=skipped,
+        cache_summary=cache.summary,
     )
     if dry_run:
         return result
 
     save_catalog(config.catalog_path(), catalog)
     result.written.append(config.catalog_path())
+
+    if use_cache:
+        cache.restrict_to([e.source for e in extractions])
+        cache.save(cache_path(config))
 
     for tag in config.target_tags():
         path = config.translations_path(tag)
@@ -104,8 +126,8 @@ def extract_project(
     return result
 
 
-def _read_one(config: ProjectConfig, entry: SourceEntry) -> Extraction:
-    source = get_source(entry.kind)
+def _read_one(config: ProjectConfig, entry: SourceEntry,
+              cache: ExtractionCache) -> Extraction:
     options = SourceOptions(
         path=(config.root / entry.path).resolve(),
         encoding=entry.encoding,
@@ -113,7 +135,40 @@ def _read_one(config: ProjectConfig, entry: SourceEntry) -> Extraction:
         symbols_path=(config.root / entry.symbols).resolve() if entry.symbols else None,
         protected_patterns=config.protected_patterns,
     )
-    return source.extract(options)
+
+    fingerprint = _fingerprint(options, config.protected_patterns)
+    cached = cache.lookup(options.relative(), fingerprint)
+    if cached is not None:
+        return Extraction(
+            source=options.relative(),
+            messages=list(cached.messages),
+            warnings=list(cached.warnings),
+            stats=dict(cached.stats),
+        )
+
+    extraction = get_source(entry.kind).extract(options)
+    cache.store(extraction.source, fingerprint, extraction.messages,
+                extraction.warnings, extraction.stats)
+    return extraction
+
+
+def _fingerprint(options: SourceOptions, patterns: tuple[str, ...]) -> str:
+    """What has to be the same for a cached extraction to still be right.
+
+    The source, the symbols file beside it, and the protected patterns, which
+    decide which messages come out marked untranslatable. Leaving the patterns
+    out meant editing them changed nothing until somebody touched the rc.
+    """
+    source = fingerprint_file(options.path)
+    if not source:
+        return ""
+
+    parts = [source]
+    if options.symbols_path is not None:
+        parts.append(fingerprint_file(options.symbols_path))
+    parts.extend(patterns)
+
+    return hashlib.sha256("\x00".join(parts).encode()).hexdigest()[:32]
 
 
 def _load_existing(config: ProjectConfig) -> Catalog:

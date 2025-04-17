@@ -13,10 +13,13 @@ __all__ = ["extract"]
 @click.command()
 @click.option("--dry-run", is_flag=True, help="Report what would change, write nothing.")
 @click.option("--keep-going", is_flag=True, help="Skip sources that cannot be read.")
+@click.option("--no-cache", is_flag=True,
+              help="Re-read every source, even the ones that have not changed.")
 @pass_context
-def extract(context: Context, dry_run: bool, keep_going: bool) -> None:
+def extract(context: Context, dry_run: bool, keep_going: bool, no_cache: bool) -> None:
     """Read every source and update the catalog."""
-    result = extract_project(context.config, dry_run=dry_run, keep_going=keep_going)
+    result = extract_project(context.config, dry_run=dry_run, keep_going=keep_going,
+                             use_cache=not no_cache)
     report(context, result, dry_run=dry_run)
 
 
@@ -31,6 +34,9 @@ def report(context: Context, result: ExtractResult, *, dry_run: bool) -> None:
         context.say(f"  {source}: {summary}", level=1)
 
     context.say(f"{result.message_count} messages: {result.report.summary()}")
+
+    if result.cache_summary:
+        context.say(f"  sources: {result.cache_summary}", level=1)
 
     for old_key, new_key in result.report.rewordings:
         context.say(f"  carried {old_key} -> {new_key}", level=1)

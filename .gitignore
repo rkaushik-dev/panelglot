@@ -21,3 +21,4 @@ htmlcov/
 out/
 *.v4l
 ~$*.xlsx
+.extraction-cache.json
