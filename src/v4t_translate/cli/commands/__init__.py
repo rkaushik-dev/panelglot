@@ -13,6 +13,7 @@ import click
 from .build import build
 from .check import check
 from .extract import extract
+from .font import font
 from .inspect import diff, doctor, stats
 from .sync import export, import_
 from .translate import memory, pretranslate
@@ -31,6 +32,7 @@ COMMANDS: tuple[click.Command, ...] = (
     diff,
     doctor,
     memory,
+    font,
 )
 
 
