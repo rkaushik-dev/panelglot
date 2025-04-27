@@ -23,11 +23,17 @@ from .errors import ConfigError
 __all__ = [
     "Locale",
     "LOCALES",
+    "NBSP",
     "canonical_tag",
     "lookup",
     "resolve",
     "known_tags",
 ]
+
+#: Non-breaking space. Several European languages group thousands with one,
+#: and it has to be the non-breaking form or a number wraps across two lines
+#: on a panel that is already too narrow.
+NBSP = " "
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,19 @@ class Locale:
     double_byte: bool = False
     """Needs a DBCS-capable panel font. The 5x7 bitmap fonts cannot serve these."""
 
+    decimal_separator: str = "."
+    """What goes between the units and the tenths.
+
+    This matters more than it looks. The printer shows a firing voltage as
+    "12.4V" and a German operator reads that as twelve thousand four hundred
+    for about a second, which on a machine with a purge button is a second
+    too long.
+    """
+
+    group_separator: str = ","
+    """What goes between thousands, if anything. Empty when the language
+    does not group."""
+
     aliases: tuple[str, ...] = field(default_factory=tuple)
     """Column headings and folder names seen in the wild for this language."""
 
@@ -65,6 +84,26 @@ class Locale:
     def python_codec(self) -> str:
         """Codec name for :func:`str.encode`, derived from the codepage."""
         return f"cp{self.codepage}"
+
+    @property
+    def language(self) -> str:
+        """The language subtag alone: ``de`` for ``de-DE``."""
+        return self.tag.split("-")[0]
+
+    def format_number(self, value: float, *, decimals: int = 1) -> str:
+        """Render a number the way this language writes it.
+
+        Used by the number rule to say what a translation should have said,
+        and by the workbook writer for the examples in the instructions.
+        """
+        text = f"{abs(value):,.{decimals}f}"
+        whole, _, fraction = text.partition(".")
+        whole = whole.replace(",", self.group_separator)
+
+        sign = "-" if value < 0 else ""
+        if not fraction:
+            return f"{sign}{whole}"
+        return f"{sign}{whole}{self.decimal_separator}{fraction}"
 
     @property
     def language_statement(self) -> str:
@@ -89,7 +128,97 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_GERMAN",
         lcid=0x0407,
         codepage=1252,
+        decimal_separator=",",
+        group_separator=".",
         aliases=("german", "de", "deu", "ger", "deutsch"),
+    ),
+    Locale(
+        tag="nl-NL",
+        english_name="Dutch",
+        win32_language="LANG_DUTCH",
+        win32_sublanguage="SUBLANG_DUTCH",
+        lcid=0x0413,
+        codepage=1252,
+        decimal_separator=",",
+        group_separator=".",
+        aliases=("dutch", "netherlands", "nl", "nld", "nederlands"),
+    ),
+    Locale(
+        tag="sv-SE",
+        english_name="Swedish",
+        win32_language="LANG_SWEDISH",
+        win32_sublanguage="SUBLANG_SWEDISH",
+        lcid=0x041D,
+        codepage=1252,
+        decimal_separator=",",
+        group_separator=NBSP,
+        aliases=("swedish", "sweden", "sv", "swe"),
+    ),
+    Locale(
+        tag="da-DK",
+        english_name="Danish",
+        win32_language="LANG_DANISH",
+        win32_sublanguage="SUBLANG_DEFAULT",
+        lcid=0x0406,
+        codepage=1252,
+        decimal_separator=",",
+        group_separator=".",
+        aliases=("danish", "denmark", "da", "dan"),
+    ),
+    Locale(
+        tag="nb-NO",
+        english_name="Norwegian",
+        win32_language="LANG_NORWEGIAN",
+        win32_sublanguage="SUBLANG_NORWEGIAN_BOKMAL",
+        lcid=0x0414,
+        codepage=1252,
+        decimal_separator=",",
+        group_separator=NBSP,
+        aliases=("norwegian", "norway", "nb", "no", "nor", "bokmal"),
+    ),
+    Locale(
+        tag="fi-FI",
+        english_name="Finnish",
+        win32_language="LANG_FINNISH",
+        win32_sublanguage="SUBLANG_DEFAULT",
+        lcid=0x040B,
+        codepage=1252,
+        decimal_separator=",",
+        group_separator=NBSP,
+        aliases=("finnish", "finland", "fi", "fin"),
+    ),
+    Locale(
+        tag="hu-HU",
+        english_name="Hungarian",
+        win32_language="LANG_HUNGARIAN",
+        win32_sublanguage="SUBLANG_DEFAULT",
+        lcid=0x040E,
+        codepage=1250,
+        decimal_separator=",",
+        group_separator=NBSP,
+        aliases=("hungarian", "hungary", "hu", "hun"),
+    ),
+    Locale(
+        tag="ro-RO",
+        english_name="Romanian",
+        win32_language="LANG_ROMANIAN",
+        win32_sublanguage="SUBLANG_DEFAULT",
+        lcid=0x0418,
+        codepage=1250,
+        decimal_separator=",",
+        group_separator=".",
+        aliases=("romanian", "romania", "ro", "ron", "rum"),
+    ),
+    Locale(
+        tag="el-GR",
+        english_name="Greek",
+        win32_language="LANG_GREEK",
+        win32_sublanguage="SUBLANG_DEFAULT",
+        lcid=0x0408,
+        codepage=1253,
+        decimal_separator=",",
+        group_separator=".",
+        aliases=("greek", "greece", "el", "ell", "gre"),
     ),
     Locale(
         tag="zh-TW",
@@ -118,6 +247,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_FRENCH",
         lcid=0x040C,
         codepage=1252,
+        decimal_separator=",",
+        group_separator=NBSP,
         aliases=("french", "fr", "fra", "francais"),
     ),
     Locale(
@@ -127,6 +258,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_SPANISH_MODERN",
         lcid=0x0C0A,
         codepage=1252,
+        decimal_separator=",",
+        group_separator=".",
         aliases=("spanish", "es", "esp", "espanol"),
     ),
     Locale(
@@ -136,6 +269,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_ITALIAN",
         lcid=0x0410,
         codepage=1252,
+        decimal_separator=",",
+        group_separator=".",
         aliases=("italian", "it", "ita"),
     ),
     Locale(
@@ -145,6 +280,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_PORTUGUESE_BRAZILIAN",
         lcid=0x0416,
         codepage=1252,
+        decimal_separator=",",
+        group_separator=".",
         aliases=("portuguese", "brazil", "pt", "pt-br", "ptb"),
     ),
     Locale(
@@ -154,6 +291,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_DEFAULT",
         lcid=0x0419,
         codepage=1251,
+        decimal_separator=",",
+        group_separator=NBSP,
         aliases=("russian", "ru", "rus"),
     ),
     Locale(
@@ -163,6 +302,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_DEFAULT",
         lcid=0x041F,
         codepage=1254,
+        decimal_separator=",",
+        group_separator=".",
         aliases=("turkish", "tr", "tur"),
     ),
     Locale(
@@ -172,6 +313,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_DEFAULT",
         lcid=0x0415,
         codepage=1250,
+        decimal_separator=",",
+        group_separator=NBSP,
         aliases=("polish", "pl", "pol"),
     ),
     Locale(
@@ -181,6 +324,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_DEFAULT",
         lcid=0x0405,
         codepage=1250,
+        decimal_separator=",",
+        group_separator=NBSP,
         aliases=("czech", "cs", "cze", "ces"),
     ),
     Locale(
@@ -219,6 +364,8 @@ LOCALES: tuple[Locale, ...] = (
         win32_sublanguage="SUBLANG_DEFAULT",
         lcid=0x042A,
         codepage=1258,
+        decimal_separator=",",
+        group_separator=".",
         aliases=("vietnamese", "vietnam", "vi", "vie"),
     ),
     Locale(
@@ -229,6 +376,13 @@ LOCALES: tuple[Locale, ...] = (
         lcid=0x0401,
         codepage=1256,
         rtl=True,
+        # The Arabic decimal and thousands marks, U+066B and U+066C, are not
+        # in cp1256. The 8-bit build cannot carry them at all, and a panel
+        # that shows half a number in one convention is worse than one that
+        # uses the Western marks throughout, which is what the Saudi
+        # distributor asked for anyway.
+        decimal_separator=".",
+        group_separator=",",
         aliases=("arabic", "ar", "ara"),
     ),
     Locale(
