@@ -18,6 +18,7 @@ from .fitting import FittingRule
 from .glossary import GlossaryRule
 from .glyphs import EncodingRule, GlyphRule
 from .mnemonics import MnemonicRule
+from .numbers import NumberRule
 from .placeholders import PlaceholderRule
 from .protected import ProtectedRule
 from .protocol import ProtocolRule
@@ -58,6 +59,7 @@ class RuleType(Protocol):
 #: Every rule, worst consequence first.
 ALL_RULES: tuple[RuleType, ...] = (
     PlaceholderRule,   # crashes the HMI
+    NumberRule,        # states the wrong limit and the operator believes it
     ProtocolRule,      # takes the serial link down
     EncodingRule,      # ships as question marks
     GlyphRule,         # draws blank
