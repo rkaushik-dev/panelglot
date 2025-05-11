@@ -10,9 +10,10 @@ from ...errors import CheckFailed
 from ...ops.diff import diff_against, outstanding_after
 from ...ops.doctor import run_doctor
 from ...ops.stats import project_stats
+from ...ops.verify import verify_pack
 from ..context import Context, pass_context
 
-__all__ = ["stats", "diff", "doctor"]
+__all__ = ["stats", "diff", "doctor", "verify"]
 
 
 @click.command()
@@ -58,6 +59,37 @@ def diff(context: Context, previous: Path, locale: str | None) -> None:
     if locale is not None:
         outstanding = outstanding_after(context.config, result, locale)
         context.say(f"{locale}: {len(outstanding)} of those are still unanswered")
+
+
+@click.command()
+@click.argument("pack", nargs=-1, required=True,
+                type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--header", "-H",
+              type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="The firmware's language header, to check the signature against.")
+@click.option("--locale", "-l", help="Insist the pack is this language.")
+@pass_context
+def verify(context: Context, pack: tuple[Path, ...], header: Path | None,
+           locale: str | None) -> None:
+    """Say whether a built .v4l pack would be loaded by the firmware."""
+    refused = 0
+
+    for path in pack:
+        result = verify_pack(path, header=header, expect_locale=locale)
+        context.say(result.describe())
+
+        for problem in result.problems:
+            context.warn(f"{path.name}: {problem}")
+        for note in result.notes:
+            context.say(f"  {note}", level=1)
+
+        if not result.accepted:
+            refused += 1
+
+    if refused:
+        raise CheckFailed(
+            f"{refused} of {len(pack)} packs would be refused", error_count=refused
+        )
 
 
 @click.command()

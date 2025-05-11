@@ -21,10 +21,12 @@ from v4t_translate.catalog.translations import TranslationState
 from v4t_translate.emit.v4l import (
     FLAG_RTL,
     FLAG_UTF16,
-    FORMAT_VERSION as V4L_VERSION,
     HEADER_SIZE,
     MAGIC,
     MAX_PACK_BYTES,
+)
+from v4t_translate.emit.v4l import (
+    FORMAT_VERSION as V4L_VERSION,
 )
 from v4t_translate.layout.panels import panel_names
 from v4t_translate.rules.registry import ANALYSIS_RULES, rule_names
