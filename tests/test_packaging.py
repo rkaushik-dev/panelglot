@@ -26,8 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 #: Must match the "for command in ..." line in the selfcheck job.
 CI_COMMANDS = [
-    "extract", "check", "export", "import", "build", "pretranslate", "stats",
-    "doctor", "memory", "diff", "font", "verify",
+    "init", "extract", "check", "export", "import", "build", "pretranslate",
+    "stats", "doctor", "memory", "diff", "font", "verify",
 ]
 
 #: Subcommands of the memory group. Checked separately because the selfcheck

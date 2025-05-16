@@ -35,10 +35,11 @@ def test_the_help_lists_them_in_working_order(runner):
     assert order == [command.name for command in COMMANDS]
 
 
-def test_extract_comes_first_and_build_does_not(runner):
+def test_the_help_starts_where_the_work_does(runner):
     order = listed(runner.invoke(main, ["--help"]).output)
-    assert order[0] == "extract"
+    assert order[:2] == ["init", "extract"]
     assert order.index("build") > order.index("check")
+    assert order.index("check") > order.index("extract")
 
 
 def test_the_order_is_not_alphabetical(runner):
