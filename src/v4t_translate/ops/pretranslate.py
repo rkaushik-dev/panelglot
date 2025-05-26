@@ -21,19 +21,30 @@ touches a protected one. Both are silently skipped and counted.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import date
 
 from ..catalog.store import Catalog, load_catalog, load_translations, save_translations
 from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
-from ..errors import CatalogError
+from ..errors import CatalogError, ConfigError
 from ..locales import Locale
 from ..mt.base import Provider
 from ..mt.memory import DEFAULT_THRESHOLD, TranslationMemory
 from ..mt.providers import get_provider
 
-__all__ = ["PretranslateResult", "pretranslate_project", "MEMORY_BATCH"]
+__all__ = [
+    "PretranslateResult",
+    "pretranslate_project",
+    "build_provider",
+    "MEMORY_BATCH",
+    "BUILTIN_PROVIDERS",
+]
+
+#: Names that always mean the built-in provider, whatever a project calls its
+#: own engines.
+BUILTIN_PROVIDERS = ("passthrough", "pseudo")
 
 #: Strings sent to a provider in one call.
 MEMORY_BATCH = 50
@@ -86,7 +97,7 @@ def pretranslate_project(
     owned_memory = memory is None
     memory = memory or TranslationMemory(config.root / config.catalog_dir / "memory.sqlite3")
 
-    engine = _resolve_provider(provider)
+    engine = _resolve_provider(config, provider)
     result = PretranslateResult(locale=entry.tag)
 
     try:
@@ -189,11 +200,45 @@ def _fill_from_provider(catalog: Catalog, translations: TranslationSet,
             result.from_provider.append(key)
 
 
-def _resolve_provider(provider: Provider | str | None) -> Provider | None:
+def build_provider(config: ProjectConfig, name: str) -> Provider:
+    """A provider by name: the built-ins first, then the project's own.
+
+    Built-ins win on a name clash. A project that calls its engine "pseudo"
+    is a project that would otherwise spend an afternoon working out why its
+    translations are full of accents.
+    """
+    if name in BUILTIN_PROVIDERS:
+        return get_provider(name)
+
+    entry = config.providers.get(name)
+    if entry is None:
+        known = sorted({*BUILTIN_PROVIDERS, *config.providers})
+        raise ConfigError(
+            f"unknown provider {name!r}. Known: {', '.join(known)}"
+        )
+
+    # Imported here so a run that does not use an engine never loads urllib.
+    from ..mt.http import HttpProvider, HttpProviderConfig
+
+    fields = {f.name for f in dataclasses.fields(HttpProviderConfig)}
+    unknown = set(entry.settings) - fields
+    if unknown:
+        raise ConfigError(
+            f"[provider.{name}] does not understand {', '.join(sorted(unknown))}. "
+            f"Known: {', '.join(sorted(fields - {'name'}))}"
+        )
+
+    return HttpProvider(
+        HttpProviderConfig(name=name, endpoint=entry.endpoint, **entry.settings)
+    )
+
+
+def _resolve_provider(config: ProjectConfig,
+                      provider: Provider | str | None) -> Provider | None:
     if provider is None:
         return None
     if isinstance(provider, str):
-        return get_provider(provider)
+        return build_provider(config, provider)
     return provider
 
 

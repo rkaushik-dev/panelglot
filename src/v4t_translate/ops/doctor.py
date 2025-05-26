@@ -80,9 +80,38 @@ def run_doctor(config: ProjectConfig) -> DoctorReport:
     _check_glossary(config, report)
     _check_rules(config, report)
     _check_outputs(config, report)
+    _check_providers(config, report)
     _check_catalog(config, report)
 
     return report
+
+
+def _check_providers(config: ProjectConfig, report: DoctorReport) -> None:
+    """A configured engine that cannot be built, or has no key in the shell."""
+    import os
+
+    from .pretranslate import build_provider
+
+    for name, entry in config.providers.items():
+        label = f"provider {name}"
+
+        try:
+            build_provider(config, name)
+        except ConfigError as exc:
+            report.add(label, False, str(exc),
+                       remedy=f"Fix [provider.{name}] in the project file.")
+            continue
+
+        variable = entry.settings.get("auth_env")
+        if variable and not os.environ.get(str(variable)):
+            report.add(
+                label, False, f"{variable} is not set in this shell",
+                remedy=f"export {variable}=... before running pretranslate. "
+                       f"The key is deliberately not in the config file.",
+            )
+            continue
+
+        report.add(label, True, entry.describe())
 
 
 def _check_python(report: DoctorReport) -> None:

@@ -30,6 +30,7 @@ __all__ = [
     "SourceEntry",
     "LocaleEntry",
     "OutputEntry",
+    "ProviderEntry",
     "CheckSettings",
     "ProjectConfig",
     "load_config",
@@ -113,6 +114,23 @@ class OutputEntry:
 
 
 @dataclass(frozen=True)
+class ProviderEntry:
+    """A machine translation engine described in the project file.
+
+    Kept as plain data rather than as an :class:`~v4t_translate.mt.http.
+    HttpProviderConfig` so that reading a config does not import the mt
+    package, which nothing needs until somebody asks for a pretranslate.
+    """
+
+    name: str
+    endpoint: str
+    settings: dict[str, Any] = field(default_factory=dict)
+
+    def describe(self) -> str:
+        return f"{self.name} -> {self.endpoint}"
+
+
+@dataclass(frozen=True)
 class CheckSettings:
     """What ``check`` treats as a failure."""
 
@@ -138,6 +156,7 @@ class ProjectConfig:
     sources: list[SourceEntry] = field(default_factory=list)
     locales: list[LocaleEntry] = field(default_factory=list)
     outputs: list[OutputEntry] = field(default_factory=list)
+    providers: dict[str, ProviderEntry] = field(default_factory=dict)
     catalog_dir: Path = Path("catalog")
     workbook_dir: Path = Path("workbooks")
     output_dir: Path = Path("out")
@@ -211,6 +230,7 @@ def _build(raw: dict[str, Any], *, root: Path, origin: str) -> ProjectConfig:
         sources=_sources(raw, origin),
         locales=_locales(raw, origin),
         outputs=_outputs(raw, origin),
+        providers=_providers(raw, origin),
     )
 
     for key, attribute in (("catalog_dir", "catalog_dir"),
@@ -299,6 +319,37 @@ def _outputs(raw: dict[str, Any], origin: str) -> list[OutputEntry]:
                 fallback_to_source=bool(entry.get("fallback", True)),
             )
         )
+
+    return result
+
+
+def _providers(raw: dict[str, Any], origin: str) -> dict[str, ProviderEntry]:
+    table = _table(raw, "provider", origin, required=False)
+    result: dict[str, ProviderEntry] = {}
+
+    for name, entry in table.items():
+        if not isinstance(entry, dict):
+            raise ConfigError(f"{origin}: [provider.{name}] is not a table")
+
+        endpoint = entry.get("endpoint")
+        if not isinstance(endpoint, str) or not endpoint:
+            raise ConfigError(f"{origin}: [provider.{name}] needs an endpoint")
+
+        if "://" not in endpoint:
+            raise ConfigError(
+                f"{origin}: [provider.{name}] endpoint {endpoint!r} is not a URL"
+            )
+
+        for forbidden in ("key", "token", "api_key", "auth", "password"):
+            if forbidden in entry:
+                raise ConfigError(
+                    f"{origin}: [provider.{name}] must not hold a {forbidden}. "
+                    f"This file goes in the repository. Name an environment "
+                    f"variable with auth_env instead"
+                )
+
+        settings = {k: v for k, v in entry.items() if k != "endpoint"}
+        result[name] = ProviderEntry(name=name, endpoint=endpoint, settings=settings)
 
     return result
 
