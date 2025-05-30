@@ -19,6 +19,7 @@ __all__ = [
     "PROTECTED_FILL",
     "REVIEW_FILL",
     "DRAFT_FILL",
+    "CHANGED_FILL",
     "COLUMN_WIDTHS",
     "header_style",
     "source_style",
@@ -30,6 +31,12 @@ HEADER_FILL = PatternFill("solid", fgColor="1F3864")
 PROTECTED_FILL = PatternFill("solid", fgColor="D9D9D9")
 REVIEW_FILL = PatternFill("solid", fgColor="FFE699")
 DRAFT_FILL = PatternFill("solid", fgColor="DEEBF7")
+
+#: Rows whose English changed since the sheet was last sent out. A different
+#: hue from the state fills on purpose: this is about what to look at, not
+#: about how far along the row is, and a translator sorting by colour needs
+#: to be able to tell those two questions apart.
+CHANGED_FILL = PatternFill("solid", fgColor="E2D3F0")
 
 HEADER_FONT = Font(color="FFFFFF", bold=True)
 SOURCE_FONT = Font(color="404040")
@@ -102,8 +109,17 @@ def metadata_style(cell) -> None:
     cell.protection = Protection(locked=True)
 
 
-def row_fill_for(state: str, *, protected: bool) -> PatternFill | None:
-    """Background for a row in a given translation state."""
+def row_fill_for(state: str, *, protected: bool,
+                 changed: bool = False) -> PatternFill | None:
+    """Background for a row in a given translation state.
+
+    Protected wins over everything, because "do not touch this" is the one
+    instruction that has to survive. Changed wins over the state fills,
+    because a row whose English moved is the row to look at first whatever
+    state it happens to be in.
+    """
     if protected:
         return PROTECTED_FILL
+    if changed:
+        return CHANGED_FILL
     return _STATE_FILLS.get(state)

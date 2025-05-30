@@ -18,11 +18,15 @@ __all__ = ["export", "import_"]
               help="Only this language. Repeatable.")
 @click.option("--outstanding", is_flag=True,
               help="Leave out anything already approved. For a follow-up round.")
+@click.option("--since", type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="A saved catalog. Rows that changed since it are coloured.")
 @pass_context
-def export(context: Context, locales: tuple[str, ...], outstanding: bool) -> None:
+def export(context: Context, locales: tuple[str, ...], outstanding: bool,
+           since: Path | None) -> None:
     """Write the workbook a translator gets sent."""
     result = export_workbooks(
-        context.config, locales=list(locales) or None, only_outstanding=outstanding
+        context.config, locales=list(locales) or None, only_outstanding=outstanding,
+        since=since,
     )
     for tag, path, rows in result.written:
         context.say(f"{tag}: {rows} rows -> {path}")

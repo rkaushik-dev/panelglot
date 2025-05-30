@@ -80,9 +80,17 @@ def export_workbooks(
     *,
     locales: list[str] | None = None,
     only_outstanding: bool = False,
+    since: Path | str | None = None,
 ) -> ExportResult:
-    """Write one workbook per language."""
+    """Write one workbook per language.
+
+    ``since`` is a saved catalog, usually the copy that went out with the last
+    round. Rows that are new or whose space has moved since then are coloured,
+    which turns "here are nine hundred rows again" into "here are the eleven
+    that changed".
+    """
     catalog = _load_catalog(config)
+    previous = load_catalog(since) if since is not None else None
     result = ExportResult()
 
     for tag in locales or config.target_tags():
@@ -92,6 +100,7 @@ def export_workbooks(
         rows = write_workbook(
             path, catalog, translations, entry.locale,
             only_outstanding=only_outstanding,
+            previous=previous,
         )
         result.written.append((entry.tag, path, rows))
 

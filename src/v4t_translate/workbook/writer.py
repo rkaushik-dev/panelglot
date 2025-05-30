@@ -19,6 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from openpyxl import Workbook
+from openpyxl.comments import Comment
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -75,6 +76,7 @@ def write_workbook(
     *,
     only_outstanding: bool = False,
     with_instructions: bool = True,
+    previous: Catalog | None = None,
 ) -> int:
     """Write the sheet for one language. Returns how many rows it holds.
 
@@ -84,6 +86,11 @@ def write_workbook(
 
     The instructions sheet goes second, so the translation sheet is the one
     that opens. Putting it first was tried and people closed the file.
+
+    ``previous`` is the catalog as it was when the last sheet went out. Rows
+    that are new or whose English has moved since then get their own colour,
+    which is the difference between "here are nine hundred rows" and "here
+    are the eleven that changed".
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,7 +109,8 @@ def write_workbook(
         if only_outstanding and translation.state is TranslationState.APPROVED:
             continue
 
-        _write_row(sheet, written + 2, message, translation)
+        _write_row(sheet, written + 2, message, translation,
+                   changed=_has_changed(message, previous))
         written += 1
 
     _finish(sheet, written)
@@ -124,7 +132,23 @@ def _write_header(sheet, locale: Locale) -> None:
         )
 
 
-def _write_row(sheet, row: int, message, translation) -> None:
+def _has_changed(message, previous: Catalog | None) -> bool:
+    """True when this row is new or its constraints moved since ``previous``."""
+    if previous is None:
+        return False
+
+    before = previous.get(message.key)
+    if before is None:
+        return True
+
+    return (
+        before.max_width_px != message.max_width_px
+        or before.max_chars != message.max_chars
+        or before.max_lines != message.max_lines
+    )
+
+
+def _write_row(sheet, row: int, message, translation, *, changed: bool = False) -> None:
     origin = message.primary_origin
     values = {
         Column.KEY: message.key,
@@ -136,13 +160,15 @@ def _write_row(sheet, row: int, message, translation) -> None:
         Column.ORIGIN: origin.describe() if origin else "",
     }
 
-    fill = row_fill_for(translation.state.value, protected=message.protected)
+    fill = row_fill_for(translation.state.value, protected=message.protected,
+                        changed=changed)
 
     for index, column in enumerate(WORKBOOK_COLUMNS, start=1):
         cell = sheet.cell(row=row, column=index, value=values[column])
 
         if column == Column.SOURCE:
             source_style(cell, protected=message.protected)
+            _annotate(cell, message, translation, changed=changed)
         elif column == Column.TARGET:
             target_style(cell, protected=message.protected)
         elif column == Column.NOTE:
@@ -152,6 +178,37 @@ def _write_row(sheet, row: int, message, translation) -> None:
 
         if fill is not None and column != Column.SOURCE:
             cell.fill = fill
+
+
+def _annotate(cell, message, translation, *, changed: bool) -> None:
+    """Hang everything a translator might want on the source cell.
+
+    A comment rather than another column. The sheet is already seven columns
+    wide on a laptop screen, and this is context somebody wants on the two
+    rows they are stuck on rather than on all nine hundred.
+    """
+    lines: list[str] = []
+
+    if changed:
+        lines.append("This row is new or its space has changed since the last round.")
+
+    for origin in message.origins[:4]:
+        lines.append(origin.describe())
+    if len(message.origins) > 4:
+        lines.append(f"and {len(message.origins) - 4} more places")
+
+    if translation.origin:
+        lines.append(f"Last answer came from {translation.origin}.")
+    if translation.updated:
+        lines.append(f"Last changed {translation.updated}.")
+
+    if not lines:
+        return
+
+    comment = Comment("\n".join(lines), "v4t-translate")
+    comment.width = 320
+    comment.height = 20 + 14 * len(lines)
+    cell.comment = comment
 
 
 def _finish(sheet, rows: int) -> None:
