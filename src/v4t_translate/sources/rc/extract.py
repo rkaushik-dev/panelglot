@@ -28,6 +28,7 @@ from ...catalog.model import Message, Origin, OriginKind
 from ...errors import SourceError
 from ...layout.dlu import base_units_for
 from ..base import Extraction, SourceOptions
+from ..notes import NoteIndex, collect_notes
 from .ast import Control, Dialog, ResourceScript
 from .parser import parse_resource_script
 from .symbols import SymbolTable, load_resource_header
@@ -69,6 +70,9 @@ class RcSource:
 
     kind = "rc"
 
+    def __init__(self) -> None:
+        self.notes: NoteIndex | None = None
+
     def extract(self, options: SourceOptions) -> Extraction:
         source = options.relative()
         extraction = Extraction(source=source)
@@ -77,6 +81,7 @@ class RcSource:
         script = parse_resource_script(text, path=source)
         symbols = self._load_symbols(options, extraction)
         protected = [re.compile(pattern) for pattern in options.protected_patterns]
+        self.notes = collect_notes(text)
 
         for dialog in script.dialogs:
             self._collect_dialog(dialog, source, symbols, protected, extraction)
@@ -86,8 +91,32 @@ class RcSource:
         self._collect_versions(script, source, protected, extraction)
 
         extraction.stats = script.counts()
+        extraction.stats["notes"] = len(self.notes)
         extraction.stats["messages"] = len(extraction.by_key())
         return extraction
+
+    def _apply_note(self, message: Message, line: int) -> Message:
+        """Attach a developer comment, and re-key if it set a context.
+
+        Re-keying rather than setting the context afterwards, because the key
+        is derived from the context and a message whose context arrives late
+        would otherwise be filed under the wrong one.
+        """
+        note = self.notes.for_line(line) if self.notes is not None else None
+        if note is None:
+            return message
+
+        if note.text:
+            message.developer_note = (
+                f"{note.text} {message.developer_note}".strip()
+                if message.developer_note else note.text
+            )
+
+        if note.context:
+            message.context = note.context
+            message.key = message_key(message.source_text, note.context)
+
+        return message
 
     # -- pieces ---------------------------------------------------------
 
@@ -103,14 +132,14 @@ class RcSource:
     def _collect_dialog(self, dialog: Dialog, source: str, symbols: SymbolTable,
                         protected: list[re.Pattern[str]], extraction: Extraction) -> None:
         if dialog.caption and not _is_boilerplate(dialog.caption):
-            extraction.messages.append(
-                _message(
-                    dialog.caption,
-                    Origin(source=source, kind=OriginKind.DIALOG_CAPTION,
-                           container=dialog.symbol, symbol=dialog.symbol, line=dialog.line),
-                    protected=_matches(dialog.caption, protected),
-                )
+            title = _message(
+                dialog.caption,
+                Origin(source=source, kind=OriginKind.DIALOG_CAPTION,
+                       container=dialog.symbol, symbol=dialog.symbol,
+                       line=dialog.line),
+                protected=_matches(dialog.caption, protected),
             )
+            extraction.messages.append(self._apply_note(title, dialog.line))
 
         units = base_units_for(dialog.font_name, dialog.font_size)
 
@@ -140,13 +169,19 @@ class RcSource:
             )
             message.max_width_px = max(budget, 0)
             message.max_lines = _line_budget(control, units.y_to_pixels(control.height))
-            extraction.messages.append(message)
+            extraction.messages.append(self._apply_note(message, control.line))
 
             if symbols.is_anonymous(control.symbol):
                 # Nothing wrong with it, but it means the origin cannot be
-                # grepped for, so the ordinal is the only way back.
-                message.developer_note = message.developer_note or (
-                    f"Anonymous control, position {control.ordinal} in {dialog.symbol}."
+                # grepped for, so the ordinal is the only way back. Appended
+                # rather than used as a fallback, because a developer's own
+                # note and this one answer different questions.
+                message.developer_note = " ".join(
+                    part for part in (
+                        message.developer_note,
+                        f"Anonymous control, position {control.ordinal} in "
+                        f"{dialog.symbol}.",
+                    ) if part
                 )
 
     def _collect_strings(self, script: ResourceScript, source: str,
@@ -154,14 +189,13 @@ class RcSource:
         for entry in script.string_entries():
             if _is_boilerplate(entry.text):
                 continue
-            extraction.messages.append(
-                _message(
-                    entry.text,
-                    Origin(source=source, kind=OriginKind.STRING_TABLE,
-                           container="STRINGTABLE", symbol=entry.symbol, line=entry.line),
-                    protected=_matches(entry.text, protected),
-                )
+            message = _message(
+                entry.text,
+                Origin(source=source, kind=OriginKind.STRING_TABLE,
+                       container="STRINGTABLE", symbol=entry.symbol, line=entry.line),
+                protected=_matches(entry.text, protected),
             )
+            extraction.messages.append(self._apply_note(message, entry.line))
 
     def _collect_versions(self, script: ResourceScript, source: str,
                           protected: list[re.Pattern[str]],
@@ -212,7 +246,7 @@ class RcSource:
                         "Everything after the tab is the accelerator label and must "
                         "stay as it is."
                     )
-                extraction.messages.append(message)
+                extraction.messages.append(self._apply_note(message, item.line))
 
 
 #: Version block fields a translator should see. Everything else in there is

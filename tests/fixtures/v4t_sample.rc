@@ -36,6 +36,8 @@ CAPTION "Barcode Properties"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Barcodes List:",IDC_STATIC,7,7,49,8
+    /* TRANSLATORS: Height of the printed bars, not of the whole barcode.
+       It is the one number an operator changes on this page. */
     LTEXT           "Bar Height",IDC_STATIC,163,26,36,8
     EDITTEXT        IDC_BAR_HEIGHT,205,24,40,14,ES_AUTOHSCROLL
     LTEXT           "Width",IDC_STATIC,163,45,20,8
@@ -103,6 +105,7 @@ END
 
 STRINGTABLE
 BEGIN
+    // TRANSLATORS: Status line, shown for two seconds after the start button.
     IDS_PRINT_STARTED       "Print started"
     IDS_SERVICE_RESTARTED   "Service restarted"
     IDS_SERVICE_NOT_RESTART "Service not restarted"
