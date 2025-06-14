@@ -24,6 +24,7 @@ static const char * const lng_en[LNG_COUNT] = {
     [LNG_PRINT_STOPPED]  = "Print stopped",        /* max 20 */
     [LNG_PURGE_SETTINGS] = "Purge Settings",       /* max 18 */
     [LNG_FIRING_VOLTAGE] = "Firing Voltage",       /* max 18 */
+    /* TRANSLATORS: The ink cartridge, not a writing pen. Six columns. */
     [LNG_PEN]            = "Pen",                  /* max 6 */
     [LNG_SPACING]        = "Spacing",              /* max 12 */
     [LNG_UNITS_MM]       = "mm",

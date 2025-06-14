@@ -37,6 +37,7 @@ from ..catalog.ids import message_key
 from ..catalog.model import Message, Origin, OriginKind
 from ..errors import ParseError, SourceError
 from .base import Extraction, SourceOptions
+from .notes import collect_notes
 
 __all__ = ["CHeaderSource", "parse_enum", "parse_table", "TableEntry"]
 
@@ -154,13 +155,20 @@ class CHeaderSource:
         entries = parse_table(text, self.source_table, enum_order=enum_order, path=source)
 
         protected = [re.compile(p) for p in options.protected_patterns]
+        notes = collect_notes(text)
 
         for entry in entries:
             if not entry.text.strip():
                 continue
+
+            note = notes.for_line(entry.line)
+            context = note.context if note and note.context else None
+
             message = Message(
-                key=message_key(entry.text),
+                key=message_key(entry.text, context),
                 source_text=entry.text,
+                context=context,
+                developer_note=note.text if note and note.text else None,
                 origins=[Origin(source=source, kind=OriginKind.C_STRING_TABLE,
                                 container=self.source_table, symbol=entry.symbol,
                                 line=entry.line)],
@@ -172,6 +180,7 @@ class CHeaderSource:
         extraction.stats = {
             "enum_ids": len(enum_order),
             "entries": len(entries),
+            "notes": len(notes),
             "messages": len(extraction.by_key()),
         }
 

@@ -173,3 +173,75 @@ def test_a_file_with_no_notes_counts_none(tmp_path):
     path.write_text('STRINGTABLE\nBEGIN\n  IDS_A "x"\nEND\n', encoding="utf-8")
     extraction = RcSource().extract(SourceOptions(path=path, root=tmp_path))
     assert extraction.stats["notes"] == 0
+
+
+def test_a_note_in_a_c_header(fixtures_dir):
+    from v4t_translate.sources.cheader import CHeaderSource
+
+    extraction = CHeaderSource().extract(
+        SourceOptions(path=fixtures_dir / "v4t_lang.h", root=fixtures_dir)
+    )
+    by_text = {m.source_text: m for m in extraction.messages}
+
+    assert "ink cartridge" in by_text["Pen"].developer_note
+    assert extraction.stats["notes"] == 1
+
+
+def test_a_context_in_a_c_header(tmp_path):
+    from v4t_translate.sources.cheader import CHeaderSource
+
+    path = tmp_path / "lang.h"
+    path.write_text(
+        "typedef enum { LNG_A, LNG_COUNT } lang_id_t;\n"
+        "static const char * const lng_en[LNG_COUNT] = {\n"
+        "    /* CONTEXT: verb */\n"
+        '    [LNG_A] = "Print",\n'
+        "};\n",
+        encoding="utf-8",
+    )
+    message = CHeaderSource().extract(
+        SourceOptions(path=path, root=tmp_path)
+    ).messages[0]
+
+    assert message.context == "verb"
+    assert message.key == message_key("Print", "verb")
+
+
+def test_a_note_in_an_android_resource(fixtures_dir):
+    from v4t_translate.sources.androidxml import AndroidXmlSource
+
+    extraction = AndroidXmlSource().extract(
+        SourceOptions(path=fixtures_dir / "strings.xml", root=fixtures_dir)
+    )
+    by_text = {m.source_text: m for m in extraction.messages}
+
+    assert "opens on" in by_text["Printer status"].developer_note
+
+
+def test_an_android_note_does_not_replace_the_translatable_note(fixtures_dir):
+    from v4t_translate.sources.androidxml import AndroidXmlSource
+
+    extraction = AndroidXmlSource().extract(
+        SourceOptions(path=fixtures_dir / "strings.xml", root=fixtures_dir)
+    )
+    by_text = {m.source_text: m for m in extraction.messages}
+    assert "translatable" in by_text["V4T Mobile"].developer_note
+
+
+def test_a_context_in_an_android_resource(tmp_path):
+    from v4t_translate.sources.androidxml import AndroidXmlSource
+
+    path = tmp_path / "strings.xml"
+    path.write_text(
+        "<resources>\n"
+        "  <!-- CONTEXT: verb -->\n"
+        '  <string name="print_verb">Print</string>\n'
+        "  <!-- CONTEXT: noun -->\n"
+        '  <string name="print_noun">Print</string>\n'
+        "</resources>\n",
+        encoding="utf-8",
+    )
+    extraction = AndroidXmlSource().extract(SourceOptions(path=path, root=tmp_path))
+
+    assert len(extraction.by_key()) == 2
+    assert {m.context for m in extraction.messages} == {"verb", "noun"}

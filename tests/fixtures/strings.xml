@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">V4T Mobile</string>
+    <!-- TRANSLATORS: Title of the screen the app opens on. -->
     <string name="printer_status">Printer status</string>
     <string name="print_started">Print started</string>
     <string name="firing_voltage">Firing Voltage</string>

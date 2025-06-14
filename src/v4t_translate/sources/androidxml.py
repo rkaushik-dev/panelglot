@@ -31,6 +31,7 @@ from ..catalog.ids import message_key
 from ..catalog.model import Message, Origin, OriginKind
 from ..errors import ParseError, SourceError
 from .base import Extraction, SourceOptions
+from .notes import Note, collect_notes
 
 __all__ = ["AndroidXmlSource", "unescape_android", "escape_android"]
 
@@ -89,12 +90,21 @@ class AndroidXmlSource:
 
     kind = "androidxml"
 
+    def __init__(self) -> None:
+        self.notes: dict[str, Note] = {}
+
     def extract(self, options: SourceOptions) -> Extraction:
         source = options.relative()
         extraction = Extraction(source=source)
 
         root = self._parse(options.path, source)
         protected = [re.compile(p) for p in options.protected_patterns]
+
+        # ElementTree throws comments away, so the notes come from a second
+        # pass over the raw text. The elements do not carry line numbers
+        # either, so they are matched by resource name instead: a comment
+        # applies to the next <string name="..."> below it.
+        self.notes = _notes_by_name(options.path)
 
         for element in root:
             handler = {
@@ -144,15 +154,23 @@ class AndroidXmlSource:
         owner = parent if parent is not None else element
         untranslatable = owner.get("translatable", "true").lower() == "false"
 
+        note = self.notes.get(container)
+        context = note.context if note and note.context else None
+
         message = Message(
-            key=message_key(text),
+            key=message_key(text, context),
             source_text=text,
+            context=context,
             origins=[Origin(source=source, kind=OriginKind.ANDROID_STRING,
                             container=container, symbol=symbol)],
             protected=untranslatable or any(p.fullmatch(text) for p in protected),
         )
+
+        parts = [note.text] if note and note.text else []
         if untranslatable:
-            message.developer_note = 'Marked translatable="false" in the resource.'
+            parts.append('Marked translatable="false" in the resource.')
+        message.developer_note = " ".join(parts) or None
+
         extraction.messages.append(message)
 
     @staticmethod
@@ -171,6 +189,32 @@ class AndroidXmlSource:
                 f"root element is <{root.tag}>, expected <resources>", path=source
             )
         return root
+
+
+#: The name attribute of a string, plurals or string-array element.
+_NAMED = re.compile(r'<(?:string|plurals|string-array)\s[^>]*name="([^"]+)"')
+
+
+def _notes_by_name(path: Path) -> dict[str, Note]:
+    """Marked comments, keyed by the resource they sit above."""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+
+    index = collect_notes(text)
+    if not index:
+        return {}
+
+    lines = text.splitlines()
+    found: dict[str, Note] = {}
+
+    for line, note in index.by_line.items():
+        match = _NAMED.search(lines[line - 1]) if line <= len(lines) else None
+        if match is not None:
+            found[match.group(1)] = note
+
+    return found
 
 
 def _inner_text(element) -> str:
