@@ -9,11 +9,36 @@ import click
 from ...errors import CheckFailed
 from ...ops.diff import diff_against, outstanding_after
 from ...ops.doctor import run_doctor
+from ...ops.prune import prune_project
 from ...ops.stats import project_stats
 from ...ops.verify import verify_pack
 from ..context import Context, pass_context
 
-__all__ = ["stats", "diff", "doctor", "verify"]
+__all__ = ["stats", "diff", "doctor", "verify", "prune"]
+
+
+@click.command()
+@click.option("--memory", "drop_memory", is_flag=True,
+              help="Also drop memory units whose English is gone from the catalog.")
+@click.option("--cache", "drop_cache", is_flag=True,
+              help="Also delete the extraction cache.")
+@click.option("--dry-run", is_flag=True, help="Report what would go, remove nothing.")
+@pass_context
+def prune(context: Context, drop_memory: bool, drop_cache: bool,
+          dry_run: bool) -> None:
+    """Drop translations and cached data the catalog no longer needs."""
+    result = prune_project(context.config, drop_memory=drop_memory,
+                           drop_cache=drop_cache, dry_run=dry_run)
+
+    for tag, keys in result.orphans.items():
+        context.say(f"{tag}: {len(keys)} translations with no message")
+        for key in keys:
+            context.say(f"  {key}", level=1)
+
+    context.say(result.summary())
+
+    if dry_run:
+        context.say("dry run, nothing removed")
 
 
 @click.command()

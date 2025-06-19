@@ -212,6 +212,18 @@ class TranslationMemory:
         with closing(self._connection.execute("SELECT COUNT(*) FROM units")) as cursor:
             return int(cursor.fetchone()[0])
 
+    def sources_for(self, locale: str) -> list[str]:
+        """Every source text held for one language.
+
+        The only enumerating method here. Everything else is a lookup, and
+        prune needs to walk a language to find the units whose English is
+        gone from the catalog.
+        """
+        with closing(self._connection.execute(
+            "SELECT source FROM units WHERE locale = ? ORDER BY source", (locale,)
+        )) as cursor:
+            return [row[0] for row in cursor]
+
     def locales(self) -> list[str]:
         with closing(self._connection.execute(
             "SELECT DISTINCT locale FROM units ORDER BY locale"
