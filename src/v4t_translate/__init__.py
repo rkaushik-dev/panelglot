@@ -14,4 +14,4 @@ each target needs.
 __all__ = ["__version__"]
 
 #: The one place the version lives. hatch reads it from here at build time.
-__version__ = "0.2.0"
+__version__ = "0.3.0"

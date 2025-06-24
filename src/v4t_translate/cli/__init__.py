@@ -20,8 +20,8 @@ from pathlib import Path
 
 import click
 
-from .. import __version__
 from ..errors import V4TError
+from ..versions import describe
 from .commands import register
 from .context import Context, pass_context
 
@@ -40,8 +40,26 @@ class OrderedGroup(click.Group):
         return list(self.commands)
 
 
+def _version(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """Print the version, or the whole build when -v came first.
+
+    The question people ask is never what version it is. It is why this
+    machine behaves differently from that one, and the answer is usually one
+    of the three format numbers rather than the package version.
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+
+    detailed = "-v" in sys.argv or "--verbose" in sys.argv
+    click.echo(describe(detailed=detailed))
+    ctx.exit()
+
+
 @click.group(cls=OrderedGroup, context_settings={"help_option_names": ["-h", "--help"]})
-@click.version_option(__version__, "-V", "--version", prog_name="v4t-translate")
+@click.option("--version", "-V", is_flag=True, expose_value=False, is_eager=True,
+              callback=_version,
+              help="Print the version. With -v, the whole build.")
 @click.option(
     "--config", "-c", "config_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
