@@ -8,7 +8,9 @@ import click
 
 from ...ops.memory import (
     absorb_catalog,
+    absorb_tmx,
     absorb_workbook,
+    export_tmx,
     memory_path,
     memory_stats,
     suggest_for,
@@ -93,6 +95,28 @@ def memory_import(context: Context, workbook: Path, sheet: str | None) -> None:
     for warning in report.warnings:
         context.warn(warning)
     context.say(report.summary())
+
+
+@memory.command("import-tmx")
+@click.argument("tmx", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("locale")
+@pass_context
+def memory_import_tmx(context: Context, tmx: Path, locale: str) -> None:
+    """Take a TMX from an agency into memory."""
+    report = absorb_tmx(context.config, tmx, locale)
+    for warning in report.warnings:
+        context.warn(warning)
+    context.say(report.summary())
+
+
+@memory.command("export-tmx")
+@click.argument("tmx", type=click.Path(dir_okay=False, path_type=Path))
+@click.argument("locale")
+@pass_context
+def memory_export_tmx(context: Context, tmx: Path, locale: str) -> None:
+    """Write one language out of memory as a TMX."""
+    written = export_tmx(context.config, tmx, locale)
+    context.say(f"{written} pairs -> {tmx}")
 
 
 @memory.command("suggest")

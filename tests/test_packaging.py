@@ -32,7 +32,9 @@ CI_COMMANDS = [
 
 #: Subcommands of the memory group. Checked separately because the selfcheck
 #: job only walks the top level.
-MEMORY_COMMANDS = ["stats", "absorb", "import", "suggest"]
+MEMORY_COMMANDS = [
+    "stats", "absorb", "import", "suggest", "import-tmx", "export-tmx",
+]
 
 
 @pytest.fixture(scope="module")

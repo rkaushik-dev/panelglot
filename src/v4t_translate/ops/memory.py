@@ -30,10 +30,11 @@ from ..catalog.translations import TranslationState
 from ..config import ProjectConfig
 from ..errors import CatalogError
 from ..mt.memory import DEFAULT_THRESHOLD, Match, TranslationMemory
+from ..mt.tmx import read_tmx, write_tmx
 from ..workbook.reader import read_workbook
 
 __all__ = ["MemoryReport", "memory_path", "absorb_catalog", "absorb_workbook",
-           "suggest_for", "memory_stats"]
+           "absorb_tmx", "export_tmx", "suggest_for", "memory_stats"]
 
 
 @dataclass
@@ -106,6 +107,45 @@ def absorb_workbook(config: ProjectConfig, path: Path | str, *,
     if report.added:
         report.locales.append(read.locale.tag)
     return report
+
+
+def absorb_tmx(config: ProjectConfig, path: Path | str, locale: str) -> MemoryReport:
+    """Take a TMX from an agency into memory."""
+    entry = config.locale_entry(locale)
+    read = read_tmx(path, entry.tag)
+
+    report = MemoryReport(warnings=list(read.warnings))
+    if read.skipped_inline:
+        report.warnings.append(
+            f"{read.skipped_inline} segments carry inline markup and were skipped. "
+            f"Dropping the markup would change the string silently"
+        )
+    if read.skipped_incomplete:
+        report.warnings.append(
+            f"{read.skipped_incomplete} segments had no {entry.tag} side"
+        )
+
+    with TranslationMemory(memory_path(config)) as memory:
+        for source, target in read.pairs:
+            memory.remember(entry.tag, source, target, origin=Path(path).name)
+            report.added += 1
+        report.total = len(memory)
+
+    if report.added:
+        report.locales.append(entry.tag)
+    return report
+
+
+def export_tmx(config: ProjectConfig, path: Path | str, locale: str) -> int:
+    """Write one language out of memory as a TMX, for an agency to quote against."""
+    from .. import __version__
+
+    entry = config.locale_entry(locale)
+    with TranslationMemory(memory_path(config)) as memory:
+        return write_tmx(
+            path, memory, entry.tag,
+            source_language=config.source_locale.tag, version=__version__,
+        )
 
 
 def suggest_for(config: ProjectConfig, locale: str, text: str, *,
