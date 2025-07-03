@@ -24,7 +24,19 @@ from pathlib import Path
 
 from ..errors import SourceError
 
-__all__ = ["FontMetrics", "parse_metrics", "load_metrics", "monospace"]
+__all__ = [
+    "FontMetrics",
+    "parse_metrics",
+    "load_metrics",
+    "monospace",
+    "MEASURE_CACHE_LIMIT",
+]
+
+#: Distinct strings a font remembers the width of before starting again.
+#: Four thousand covers a real catalog and its wrapped fragments; a pseudo
+#: run produces a different string per message and would otherwise hold the
+#: whole thing twice.
+MEASURE_CACHE_LIMIT = 4096
 
 _HEADER = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
 _RANGE = re.compile(r"^([0-9A-Fa-f]{2,6})(?:\.\.([0-9A-Fa-f]{2,6}))?\s+(\d+)$")
@@ -46,11 +58,25 @@ class FontMetrics:
     ranges: list[tuple[int, int]] = field(default_factory=list)
     """Covered codepoint ranges, inclusive at both ends."""
 
+    _measured: dict[str, int] = field(default_factory=dict, repr=False,
+                                      compare=False)
+    """Width cache. Excluded from repr and from equality: it is derived."""
+
     def __post_init__(self) -> None:
         if not self.line_height:
             self.line_height = self.pixel_size + 2
         if not self.default_width:
             self.default_width = max(1, self.pixel_size // 2)
+        self._measured.clear()
+
+    def invalidate(self) -> None:
+        """Forget measurements. Call after changing widths or ranges.
+
+        Nothing in the package mutates a font after loading it, but a test
+        that builds one by hand and then adds a glyph would otherwise get a
+        stale answer, and that is a bad afternoon for whoever hits it.
+        """
+        self._measured.clear()
 
     def covers(self, char: str) -> bool:
         """True when the font can draw ``char``."""
@@ -87,8 +113,25 @@ class FontMetrics:
         return self.default_width
 
     def measure(self, text: str) -> int:
-        """Rendered width of a single line, in pixels."""
-        return sum(self.advance(char) for char in text if char not in "\n\r")
+        """Rendered width of a single line, in pixels.
+
+        Memoised. Wrapping measures the same handful of words over and over
+        while it searches for a break, and a check over a real catalog calls
+        this about forty times per message. The cache is bounded because a
+        pseudo-localised run produces a different string for every message
+        and an unbounded one would hold the whole catalog twice.
+        """
+        cached = self._measured.get(text)
+        if cached is not None:
+            return cached
+
+        width = sum(self.advance(char) for char in text if char not in "\n\r")
+
+        if len(self._measured) >= MEASURE_CACHE_LIMIT:
+            self._measured.clear()
+        self._measured[text] = width
+
+        return width
 
     @property
     def coverage_size(self) -> int:
