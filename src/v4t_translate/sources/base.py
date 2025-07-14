@@ -37,6 +37,14 @@ class SourceOptions:
     protected_patterns: tuple[str, ...] = ()
     """Regexes whose matches are marked untranslatable at extraction time."""
 
+    symbols: dict[str, bool] = field(default_factory=dict)
+    """Preprocessor symbols and whether this product defines them.
+
+    A name that is not in here is undecidable, which is not the same as
+    undefined: a reader must keep strings behind a condition it cannot
+    resolve rather than guess them away.
+    """
+
     def relative(self, path: Path | None = None) -> str:
         """Path as it should appear in an origin: relative, forward slashes."""
         target = path or self.path

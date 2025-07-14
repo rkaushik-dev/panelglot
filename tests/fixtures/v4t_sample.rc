@@ -58,6 +58,7 @@ BEGIN
     CONTROL         IDB_TOOLBAR,IDC_TOOLBAR_IMAGE,"Static",SS_BITMAP,7,7,16,16
 END
 
+#ifdef V4T_8PEN
 IDD_PEN_OFFSETS DIALOGEX 0, 0, 240, 160
 STYLE DS_SETFONT | WS_CHILD
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -73,6 +74,7 @@ BEGIN
     RTEXT           "Spacing",IDC_STATIC,140,120,28,8
     COMBOBOX        IDC_ORIENTATION,180,118,53,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
+#endif
 
 /////////////////////////////////////////////////////////////////////////////
 //

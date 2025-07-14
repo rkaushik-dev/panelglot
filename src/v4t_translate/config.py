@@ -69,6 +69,23 @@ class SourceEntry:
     encoding: str = "utf-8-sig"
     symbols: Path | None = None
 
+    defines: tuple[str, ...] = ()
+    """Preprocessor symbols this product defines."""
+
+    undefines: tuple[str, ...] = ()
+    """Symbols it explicitly does not.
+
+    Separate from simply leaving one out, because the two mean different
+    things: a name in neither list is one the reader cannot decide, and it
+    keeps the strings behind it.
+    """
+
+    def condition_symbols(self) -> dict[str, bool]:
+        return {
+            **{name: True for name in self.defines},
+            **{name: False for name in self.undefines},
+        }
+
     def describe(self) -> str:
         return f"{self.kind}:{self.path.as_posix()}"
 
@@ -273,12 +290,24 @@ def _sources(raw: dict[str, Any], origin: str) -> list[SourceEntry]:
         if not isinstance(kind, str) or not isinstance(path, str):
             raise ConfigError(f"{origin}: source {index} needs a 'kind' and a 'path'")
         symbols = entry.get("symbols")
+        defines = tuple(str(name) for name in entry.get("defines", []))
+        undefines = tuple(str(name) for name in entry.get("undefines", []))
+
+        clash = set(defines) & set(undefines)
+        if clash:
+            raise ConfigError(
+                f"{origin}: source {index} both defines and undefines "
+                f"{', '.join(sorted(clash))}"
+            )
+
         result.append(
             SourceEntry(
                 kind=kind,
                 path=Path(path),
                 encoding=str(entry.get("encoding", "utf-8-sig")),
                 symbols=Path(str(symbols)) if symbols else None,
+                defines=defines,
+                undefines=undefines,
             )
         )
 

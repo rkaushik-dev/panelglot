@@ -30,6 +30,7 @@ from ...layout.dlu import base_units_for
 from ..base import Extraction, SourceOptions
 from ..notes import NoteIndex, collect_notes
 from .ast import Control, Dialog, ResourceScript
+from .conditions import ConditionMap, collect_conditions
 from .parser import parse_resource_script
 from .symbols import SymbolTable, load_resource_header
 
@@ -61,7 +62,8 @@ _BOXED_STYLES = frozenset(
 )
 
 #: A caption that is only punctuation or digits is not a translatable string.
-#: "4." in the shipped Taiwan sheet came back as "4。" and shipped like that.
+#: "4." went through the machine translator and came back as a 4 followed by
+#: an ideographic full stop, and it shipped like that.
 _NOT_WORDS = re.compile(r"^[\W\d_]*$", re.UNICODE)
 
 
@@ -72,6 +74,8 @@ class RcSource:
 
     def __init__(self) -> None:
         self.notes: NoteIndex | None = None
+        self.conditions: ConditionMap | None = None
+        self.symbols: dict[str, bool] = {}
 
     def extract(self, options: SourceOptions) -> Extraction:
         source = options.relative()
@@ -82,6 +86,8 @@ class RcSource:
         symbols = self._load_symbols(options, extraction)
         protected = [re.compile(pattern) for pattern in options.protected_patterns]
         self.notes = collect_notes(text)
+        self.conditions = collect_conditions(text)
+        self.symbols = dict(options.symbols)
 
         for dialog in script.dialogs:
             self._collect_dialog(dialog, source, symbols, protected, extraction)
@@ -94,6 +100,31 @@ class RcSource:
         extraction.stats["notes"] = len(self.notes)
         extraction.stats["messages"] = len(extraction.by_key())
         return extraction
+
+    def _keep(self, line: int) -> bool:
+        """Whether a string on this line is in the product being extracted."""
+        if self.conditions is None:
+            return True
+        return self.conditions.is_live(line, self.symbols)
+
+    def _apply_conditions(self, message: Message, line: int) -> Message:
+        """Note the conditions a kept string is behind.
+
+        A translator has no other way to know that "Pen 5" only exists on one
+        product, and that is exactly the context that stops somebody
+        wondering whether it is a mistake.
+        """
+        if self.conditions is None:
+            return message
+
+        named = self.conditions.describe(line)
+        if named:
+            message.developer_note = " ".join(
+                part for part in (
+                    message.developer_note, f"Only built when {named}.",
+                ) if part
+            )
+        return message
 
     def _apply_note(self, message: Message, line: int) -> Message:
         """Attach a developer comment, and re-key if it set a context.
@@ -139,7 +170,11 @@ class RcSource:
                        line=dialog.line),
                 protected=_matches(dialog.caption, protected),
             )
-            extraction.messages.append(self._apply_note(title, dialog.line))
+            if self._keep(dialog.line):
+                extraction.messages.append(
+                    self._apply_conditions(self._apply_note(title, dialog.line),
+                                           dialog.line)
+                )
 
         units = base_units_for(dialog.font_name, dialog.font_size)
 
@@ -169,7 +204,11 @@ class RcSource:
             )
             message.max_width_px = max(budget, 0)
             message.max_lines = _line_budget(control, units.y_to_pixels(control.height))
-            extraction.messages.append(self._apply_note(message, control.line))
+            if self._keep(control.line):
+                extraction.messages.append(
+                    self._apply_conditions(self._apply_note(message, control.line),
+                                           control.line)
+                )
 
             if symbols.is_anonymous(control.symbol):
                 # Nothing wrong with it, but it means the origin cannot be
@@ -195,7 +234,11 @@ class RcSource:
                        container="STRINGTABLE", symbol=entry.symbol, line=entry.line),
                 protected=_matches(entry.text, protected),
             )
-            extraction.messages.append(self._apply_note(message, entry.line))
+            if self._keep(entry.line):
+                extraction.messages.append(
+                    self._apply_conditions(self._apply_note(message, entry.line),
+                                           entry.line)
+                )
 
     def _collect_versions(self, script: ResourceScript, source: str,
                           protected: list[re.Pattern[str]],
@@ -246,7 +289,11 @@ class RcSource:
                         "Everything after the tab is the accelerator label and must "
                         "stay as it is."
                     )
-                extraction.messages.append(self._apply_note(message, item.line))
+                if self._keep(item.line):
+                    extraction.messages.append(
+                        self._apply_conditions(self._apply_note(message, item.line),
+                                               item.line)
+                    )
 
 
 #: Version block fields a translator should see. Everything else in there is

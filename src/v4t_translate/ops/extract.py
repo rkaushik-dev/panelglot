@@ -134,6 +134,7 @@ def _read_one(config: ProjectConfig, entry: SourceEntry,
         root=config.root.resolve(),
         symbols_path=(config.root / entry.symbols).resolve() if entry.symbols else None,
         protected_patterns=config.protected_patterns,
+        symbols=entry.condition_symbols(),
     )
 
     fingerprint = _fingerprint(options, config.protected_patterns)
@@ -167,6 +168,7 @@ def _fingerprint(options: SourceOptions, patterns: tuple[str, ...]) -> str:
     if options.symbols_path is not None:
         parts.append(fingerprint_file(options.symbols_path))
     parts.extend(patterns)
+    parts.extend(f"{name}={value}" for name, value in sorted(options.symbols.items()))
 
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()[:32]
 
