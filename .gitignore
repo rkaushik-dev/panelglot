@@ -22,3 +22,5 @@ out/
 *.v4l
 ~$*.xlsx
 .extraction-cache.json
+catalog/.extraction-cache.json
+catalog/memory.sqlite3

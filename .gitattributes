@@ -1,0 +1,13 @@
+# Line endings are LF in the repository, everywhere, including on Windows.
+#
+# One file went in with CRLF after being edited by a script and the diff was
+# the whole file, which hid the six lines that had actually changed. The rc
+# and header fixtures matter most: those are read byte for byte by tests that
+# assert on offsets into them.
+* text=auto eol=lf
+
+# Workbooks are zip archives. Anything that touches their bytes corrupts them.
+*.xlsx binary
+*.v4l binary
+*.ico binary
+*.bmp binary
