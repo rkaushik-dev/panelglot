@@ -14,8 +14,9 @@ from __future__ import annotations
 
 from ..ops.check import CheckResult
 from ..rules.result import Finding, Report, Severity
+from .style import Palette, palette_for
 
-__all__ = ["format_report", "format_finding", "DEFAULT_LIMIT"]
+__all__ = ["format_report", "format_finding", "format_check", "DEFAULT_LIMIT"]
 
 #: Findings shown per rule before the rest are counted instead.
 DEFAULT_LIMIT = 12
@@ -27,28 +28,38 @@ _MARKERS = {
 }
 
 
-def format_finding(finding: Finding, *, show_detail: bool = True) -> list[str]:
+def format_finding(finding: Finding, *, show_detail: bool = True,
+                   palette: Palette | None = None) -> list[str]:
     """One finding as a block of lines."""
-    marker = _MARKERS[finding.severity]
-    lines = [f"  {marker} {finding.locale} {_quote(finding.source_text)}"]
+    colours = palette if palette is not None else Palette()
+    marker = colours.severity(_MARKERS[finding.severity], finding.severity)
+
+    lines = [
+        f"  {marker} {colours.dim(finding.locale)} "
+        f"{colours.paint(_quote(finding.source_text), 'source')}"
+    ]
 
     if finding.translated_text:
-        lines.append(f"      -> {_quote(finding.translated_text)}")
+        lines.append(
+            f"      -> {colours.paint(_quote(finding.translated_text), 'target')}"
+        )
 
     lines.append(f"      {finding.summary}")
 
     if show_detail and finding.detail:
-        lines.append(f"      {finding.detail}")
+        lines.append(f"      {colours.dim(finding.detail)}")
 
     if finding.origin:
-        lines.append(f"      {finding.origin}")
+        lines.append(f"      {colours.dim(finding.origin)}")
 
     return lines
 
 
 def format_report(report: Report, *, limit: int = DEFAULT_LIMIT,
-                  show_detail: bool = True) -> str:
+                  show_detail: bool = True, palette: Palette | None = None) -> str:
     """The whole report, grouped by rule."""
+    colours = palette if palette is not None else Palette()
+
     if not report:
         return report.summary()
 
@@ -56,16 +67,20 @@ def format_report(report: Report, *, limit: int = DEFAULT_LIMIT,
 
     for rule, findings in report.by_rule().items():
         worst = max(f.severity for f in findings)
-        heading = f"{rule} ({len(findings)}, worst {worst})"
+        heading = colours.bold(f"{rule} ({len(findings)}, worst {worst})")
         lines = [heading]
 
         shown = findings if limit <= 0 else findings[:limit]
         for finding in shown:
-            lines.extend(format_finding(finding, show_detail=show_detail))
+            lines.extend(
+                format_finding(finding, show_detail=show_detail, palette=colours)
+            )
 
         hidden = len(findings) - len(shown)
         if hidden:
-            lines.append(f"  ... and {hidden} more, use --limit 0 to see them all")
+            lines.append(
+                colours.dim(f"  ... and {hidden} more, use --limit 0 to see them all")
+            )
 
         blocks.append("\n".join(lines))
 
@@ -74,12 +89,17 @@ def format_report(report: Report, *, limit: int = DEFAULT_LIMIT,
 
 
 def format_check(result: CheckResult, *, limit: int = DEFAULT_LIMIT,
-                 show_detail: bool = True) -> str:
+                 show_detail: bool = True, colour: bool | None = None) -> str:
     """A check result: what was checked, then what was found."""
-    lines = [check.describe() for check in result.locales]
+    palette = palette_for(force=colour)
+
+    lines = [palette.dim(check.describe()) for check in result.locales]
     if lines:
         lines.append("")
-    lines.append(format_report(result.report, limit=limit, show_detail=show_detail))
+    lines.append(
+        format_report(result.report, limit=limit, show_detail=show_detail,
+                      palette=palette)
+    )
     return "\n".join(lines)
 
 
