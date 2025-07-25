@@ -26,7 +26,7 @@ from ..glossary import load_glossary
 from ..layout.panels import font_for, get_panel, panel_names
 from ..rules.registry import build_rules
 from ..sources.registry import available_kinds as source_kinds
-from .build import resolve_output_path
+from .build import is_inside, resolve_output_path
 
 __all__ = ["Finding", "DoctorReport", "run_doctor"]
 
@@ -271,8 +271,20 @@ def _check_outputs(config: ProjectConfig, report: DoctorReport) -> None:
         for entry in config.locales:
             if not output.applies_to(entry.tag):
                 continue
+
             resolved = resolve_output_path(output.path, project=config.name,
                                            locale=entry.locale)
+
+            if not output.allow_outside and not is_inside(config.root / resolved,
+                                                          config.root):
+                report.add(
+                    name, False, f"{resolved} is outside the project",
+                    remedy="Fix the path, or set allow_outside on that output "
+                           "if writing there is deliberate.",
+                )
+                collided = True
+                break
+
             previous = seen.get(resolved)
             if previous is not None:
                 report.add(

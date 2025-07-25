@@ -122,6 +122,14 @@ class OutputEntry:
     encoding: str | None = None
     fallback_to_source: bool = True
 
+    allow_outside: bool = False
+    """Let this output write outside the project directory.
+
+    Off by default. A path template is text out of a config file and the
+    build runs on machines nobody is watching, so ``..`` in one has to be
+    said out loud rather than discovered.
+    """
+
     def applies_to(self, tag: str) -> bool:
         return not self.locales or tag in self.locales
 
@@ -346,6 +354,7 @@ def _outputs(raw: dict[str, Any], origin: str) -> list[OutputEntry]:
                 source=Path(str(source)) if source else None,
                 encoding=entry.get("encoding"),
                 fallback_to_source=bool(entry.get("fallback", True)),
+                allow_outside=bool(entry.get("allow_outside", False)),
             )
         )
 

@@ -27,7 +27,13 @@ from ..emit.registry import get_emitter
 from ..errors import CatalogError, EmitError
 from ..locales import Locale
 
-__all__ = ["BuildResult", "build_project", "resolve_output_path"]
+__all__ = [
+    "BuildResult",
+    "build_project",
+    "resolve_output_path",
+    "destination_for",
+    "is_inside",
+]
 
 
 @dataclass
@@ -65,6 +71,41 @@ def resolve_output_path(template: str, *, project: str, locale: Locale) -> str:
         language=locale.tag.split("-")[0],
         qualifier=qualifier_for(locale),
         codepage=locale.codepage,
+    )
+
+
+def is_inside(path: Path, root: Path) -> bool:
+    """Whether ``path`` resolves to somewhere under ``root``."""
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def destination_for(config: ProjectConfig, output: OutputEntry,
+                    entry: LocaleEntry) -> Path:
+    """Where one output lands, with the path checked before anything is written.
+
+    An output path is a template out of a config file, and this runs on build
+    machines. A template with ``..`` in it, or an absolute path somebody
+    pasted from their own laptop, would write outside the project, and the
+    only sign would be a file appearing somewhere nobody looked.
+
+    A project that genuinely needs to write elsewhere says so with
+    ``allow_outside``, which is one word in a config and shows up in review.
+    """
+    relative = resolve_output_path(output.path, project=config.name,
+                                   locale=entry.locale)
+    destination = config.root / relative
+
+    if output.allow_outside or is_inside(destination, config.root):
+        return destination
+
+    raise EmitError(
+        f"output {output.kind} for {entry.tag} resolves to {destination}, which "
+        f"is outside {config.root}. Set allow_outside on that output if that is "
+        f"deliberate"
     )
 
 
@@ -118,9 +159,7 @@ def _produce(config: ProjectConfig, catalog: Catalog, translations, entry: Local
     Putting it beside meant a dry run created the whole output tree before
     deciding not to write anything into it.
     """
-    relative = resolve_output_path(output.path, project=config.name, locale=entry.locale)
-    destination = config.root / relative
-
+    destination = destination_for(config, output, entry)
     emitter = get_emitter(output.kind)
 
     with tempfile.TemporaryDirectory(prefix="v4t-build-") as scratch_dir:
