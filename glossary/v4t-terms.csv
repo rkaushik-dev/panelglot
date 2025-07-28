@@ -1,16 +1,20 @@
-term,locale,translation,note
-pen,de-DE,Stift,The physical cartridge. Never Feder or Patrone.
-printhead,de-DE,Druckkopf,Compounds are fine: Druckkopfspannung.
-purge,de-DE,Bereinigung,Agreed with the distributor 2024-06.
-photocell,de-DE,Fotozelle,
-spacing,de-DE,Abstand,
-offset,de-DE,Versatz,Not Offset. The English word reads as a printing term here.
-barcode,de-DE,Barcode,Stays English by agreement.
-firing voltage,de-DE,Zündspannung,
-traverse,de-DE,Querdruck,
-pen,zh-TW,筆,
-printhead,zh-TW,列印頭,Not 打印頭. That is the mainland term.
-purge,zh-TW,清洗,
-photocell,zh-TW,光電感應器,
-spacing,zh-TW,間距,
-barcode,zh-TW,條碼,The shipped sheet says 條形碼 throughout and it has to be fixed.
+term,locale,translation,forbidden,note
+pen,de-DE,Stift,feder;patrone,The physical cartridge. Settled 2024-03 after the service manual used all three.
+printhead,de-DE,Druckkopf,,Compounds are fine: Druckkopfspannung.
+purge,de-DE,Bereinigung,spülung,Agreed with the distributor 2024-06.
+photocell,de-DE,Fotozelle,photozelle,
+spacing,de-DE,Abstand,,
+offset,de-DE,Versatz,,Not Offset. The English word reads as a printing term here.
+barcode,de-DE,Barcode,strichcode,Stays English by agreement.
+firing voltage,de-DE,Zündspannung,,
+traverse,de-DE,Querdruck,,
+encoder,de-DE,Drehgeber,kodierer;encoder,
+V4T,de-DE,=,,Product name. Never translated and never recased.
+pen,zh-TW,筆,墨匣,
+printhead,zh-TW,列印頭,打印頭,Not 打印頭. That is the mainland term.
+purge,zh-TW,清洗,清潔,
+photocell,zh-TW,光電感應器,,
+spacing,zh-TW,間距,,
+barcode,zh-TW,條碼,條形碼,The shipped sheet says 條形碼 throughout and it has to be fixed.
+encoder,zh-TW,編碼器,,
+V4T,zh-TW,=,,Product name. Never translated and never recased.

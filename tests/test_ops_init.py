@@ -22,7 +22,7 @@ def test_a_bare_scaffold(tmp_path):
 def test_the_glossary_has_its_header_row(tmp_path):
     init_project(tmp_path, name="V4T-Mini")
     header = (tmp_path / "glossary" / "terms.csv").read_text(encoding="utf-8")
-    assert header.strip() == "term,locale,translation,note"
+    assert header.strip() == "term,locale,translation,forbidden,note"
 
 
 def test_the_gitignore_lines(tmp_path):

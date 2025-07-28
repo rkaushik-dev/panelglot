@@ -222,8 +222,10 @@ def _check_glossary(config: ProjectConfig, report: DoctorReport) -> None:
         report.add("glossary", True, f"{path.name} is empty or missing")
         return
 
-    report.add("glossary", True,
-               f"{len(glossary)} terms across {', '.join(glossary.locales())}")
+    detail = f"{len(glossary)} terms across {', '.join(glossary.locales())}"
+    if glossary.forbidden_count:
+        detail += f", {glossary.forbidden_count} forbidden renderings"
+    report.add("glossary", True, detail)
 
     configured = set(config.target_tags())
     orphans = sorted(set(glossary.locales()) - configured)

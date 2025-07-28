@@ -19,7 +19,7 @@ from ..catalog.store import Catalog, load_catalog, load_translations
 from ..catalog.translations import TranslationSet
 from ..config import LocaleEntry, ProjectConfig
 from ..errors import CatalogError
-from ..glossary import load_glossary
+from ..glossary import Term, load_glossary
 from ..layout.font import FontMetrics
 from ..layout.panels import Panel, font_for, get_panel
 from ..rules.base import RuleContext
@@ -119,9 +119,9 @@ def context_for_locale(config: ProjectConfig, entry: LocaleEntry,
     font = font_for(panel, search=_font_search_path(config), explicit=explicit)
     is_fallback = font.name.endswith("-fallback")
 
-    terms: dict[str, str] = {}
+    terms: dict[str, Term] = {}
     if glossary is not None:
-        terms = {key: term.translation for key, term in glossary.for_locale(entry.tag).items()}
+        terms = glossary.for_locale(entry.tag)
 
     context = RuleContext(
         locale=entry.locale,

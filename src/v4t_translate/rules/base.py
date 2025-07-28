@@ -15,6 +15,7 @@ from typing import Protocol, runtime_checkable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation
+from ..glossary import Term
 from ..layout.font import FontMetrics
 from ..layout.panels import Panel
 from ..locales import Locale
@@ -30,8 +31,13 @@ class RuleContext:
     locale: Locale
     panel: Panel
     font: FontMetrics
-    glossary: dict[str, str] = field(default_factory=dict)
-    """Source term to required target term, both already lowered."""
+    glossary: dict[str, Term] = field(default_factory=dict)
+    """Lowered source term to the agreed term, for this locale only.
+
+    This used to be a plain term to translation mapping. It carries the whole
+    Term now because a decision is more than the word that won: it is also the
+    words that lost, and the note saying why.
+    """
 
     source_locale: str = "en-US"
 

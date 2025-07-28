@@ -148,7 +148,7 @@ def init_project(root: Path | str, *, name: str,
     _write(
         result,
         root / "glossary" / "terms.csv",
-        ",".join([*REQUIRED_COLUMNS, "note"]) + "\n",
+        ",".join([*REQUIRED_COLUMNS, "forbidden", "note"]) + "\n",
     )
     _write(result, root / "fonts" / ".gitkeep", "")
 

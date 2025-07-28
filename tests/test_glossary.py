@@ -27,11 +27,18 @@ def write(tmp_path: Path, text: str) -> Path:
 
 
 def context_for(tag="de-DE", terms=None):
+    # Written as term to translation here because that is what these tests are
+    # about. The context wants whole Terms, which carry the forbidden list and
+    # the note as well.
+    agreed = {
+        key: Term(term=key, locale=tag, translation=value)
+        for key, value in (terms or {}).items()
+    }
     return RuleContext(
         locale=resolve(tag),
         panel=get_panel("tij-800x600"),
         font=monospace(6, ranges=[(0x20, 0x9FFF)]),
-        glossary=terms or {},
+        glossary=agreed,
     )
 
 
