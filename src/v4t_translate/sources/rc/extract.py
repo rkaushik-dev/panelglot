@@ -14,8 +14,10 @@ that visibly overflow, which is worse than not checking at all.
 
 Menu accelerators are left inside the message. ``&New\\tCtrl+N`` is one string
 to the resource compiler, and splitting it would mean reassembling it on the
-way out and getting the tab wrong in some locale. The protected-token rule
-enforces the suffix instead.
+way out and getting the tab wrong in some locale. What the extractor does
+instead is look the command id up in the file's accelerator tables and put the
+key that actually fires into the note, so the shortcuts rule and the person
+doing the work are both told the same thing.
 """
 
 from __future__ import annotations
@@ -29,12 +31,50 @@ from ...errors import SourceError
 from ...layout.dlu import base_units_for
 from ..base import Extraction, SourceOptions
 from ..notes import NoteIndex, collect_notes
-from .ast import Control, Dialog, ResourceScript
+from .ast import Control, Dialog, MenuItem, ResourceScript
 from .conditions import ConditionMap, collect_conditions
 from .parser import parse_resource_script
 from .symbols import SymbolTable, load_resource_header
 
-__all__ = ["RcSource", "control_text_budget"]
+__all__ = ["RcSource", "control_text_budget", "shortcut_note"]
+
+
+def shortcut_note(script: ResourceScript, item: MenuItem) -> str:
+    """What a translator needs to know about this item's shortcut hint.
+
+    The note used to say the whole thing after the tab had to stay as it is,
+    which is wrong and was ignored for being wrong. German writes Strg for
+    Ctrl and Umschalt for Shift, and those are the correct translations. What
+    cannot move is the key at the end, because that one is bound in the
+    accelerator table and the accelerator table is not translated.
+
+    So the note names the key, and says where it came from.
+    """
+    hint = item.shortcut
+    if hint is None:
+        return ""
+
+    bound = script.accelerator_for(item.symbol) if item.symbol else None
+
+    if bound is None:
+        return (
+            f"The menu advertises {hint} after the tab, but nothing in this "
+            f"file's accelerator tables binds {item.symbol or 'this item'}. "
+            f"Keep the hint as it is and raise it with the developer."
+        )
+
+    key = _final_key(hint)
+    return (
+        f"Everything after the tab is a shortcut hint. Modifier names are "
+        f"translated: German writes Strg for Ctrl. The key {key} is not. It "
+        f"is bound in {bound.symbol} and the accelerator table is the same in "
+        f"every language."
+    )
+
+
+def _final_key(hint: str) -> str:
+    """The last piece of a shortcut hint, which is the key that fires."""
+    return hint.replace("-", "+").split("+")[-1].strip() or hint
 
 #: Pixels a control spends on its own decoration before any text is drawn.
 #: Measured against the standard themed metrics at 96 DPI.
@@ -284,11 +324,9 @@ class RcSource:
                            symbol=item.symbol or menu.symbol, line=item.line, ordinal=index),
                     protected=_matches(item.text, protected),
                 )
-                if "\t" in item.text:
-                    message.developer_note = (
-                        "Everything after the tab is the accelerator label and must "
-                        "stay as it is."
-                    )
+                note = shortcut_note(script, item)
+                if note:
+                    message.developer_note = note
                 if self._keep(item.line):
                     extraction.messages.append(
                         self._apply_conditions(self._apply_note(message, item.line),

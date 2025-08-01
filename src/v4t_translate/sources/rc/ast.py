@@ -16,6 +16,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 __all__ = [
+    "Accelerator",
+    "AcceleratorTable",
     "Control",
     "Dialog",
     "MenuItem",
@@ -148,6 +150,105 @@ class MenuItem:
         for child in self.children:
             yield from child.walk()
 
+    @property
+    def shortcut(self) -> str | None:
+        """The hint after the tab, if this item advertises a shortcut.
+
+        ``MENUITEM "&New\\tCtrl+N", ID_FILE_NEW`` draws Ctrl+N right aligned
+        in the menu. The hint is only text. The key that actually works comes
+        from the accelerator table, which is not translated, so the two can
+        disagree and nothing in the build notices.
+        """
+        if not self.text or "\t" not in self.text:
+            return None
+        return self.text.split("\t", 1)[1] or None
+
+
+@dataclass
+class Accelerator:
+    """One row of an ``ACCELERATORS`` table."""
+
+    key: str
+    """The key as written: ``"^N"``, ``"N"`` or a ``VK_`` name."""
+
+    symbol: str
+    """The command id this fires, which is what ties it to a menu item."""
+
+    flags: list[str] = field(default_factory=list)
+    """``VIRTKEY``, ``CONTROL``, ``SHIFT``, ``ALT``, ``ASCII``, ``NOINVERT``."""
+
+    quoted: bool = False
+    """Whether the key was a string literal rather than a ``VK_`` name."""
+
+    line: int = 0
+
+    def has_flag(self, name: str) -> bool:
+        return name.upper() in {flag.upper() for flag in self.flags}
+
+    def describe(self) -> str:
+        """The shortcut as a person would write it, for a translator note.
+
+        This is what the menu hint is supposed to say, so producing it here
+        is what lets the two be compared at all.
+        """
+        parts: list[str] = []
+        key = self.key
+
+        if self.quoted and key.startswith("^"):
+            # The old ASCII form. ^N is control-N whatever the flags say.
+            parts.append("Ctrl")
+            key = key[1:]
+        else:
+            if self.has_flag("CONTROL"):
+                parts.append("Ctrl")
+            if self.has_flag("ALT"):
+                parts.append("Alt")
+            if self.has_flag("SHIFT"):
+                parts.append("Shift")
+
+        parts.append(_key_name(key))
+        return "+".join(parts)
+
+
+def _key_name(key: str) -> str:
+    """Turn a raw key into what a menu hint would show."""
+    if key.startswith("VK_"):
+        name = key[3:]
+        return _VIRTUAL_KEY_NAMES.get(name, name.title() if len(name) > 1 else name)
+    return key.upper() if len(key) == 1 else key
+
+
+#: Only the ones whose menu spelling is not just the name title cased.
+_VIRTUAL_KEY_NAMES = {
+    "PRIOR": "PgUp",
+    "NEXT": "PgDn",
+    "RETURN": "Enter",
+    "ESCAPE": "Esc",
+    "OEM_PLUS": "+",
+    "OEM_MINUS": "-",
+}
+
+
+@dataclass
+class AcceleratorTable:
+    """An ``ACCELERATORS`` resource.
+
+    Kept because the keys in it are the ones that work, and none of them are
+    translated. A German build whose Neu menu item says Strg+N while the
+    table still fires on N is right. One that says Strg+U is a shortcut that
+    does nothing, and it ships.
+    """
+
+    symbol: str
+    entries: list[Accelerator] = field(default_factory=list)
+    line: int = 0
+
+    def for_command(self, symbol: str) -> Accelerator | None:
+        for entry in self.entries:
+            if entry.symbol == symbol:
+                return entry
+        return None
+
 
 @dataclass
 class Menu:
@@ -217,6 +318,7 @@ class ResourceScript:
     dialogs: list[Dialog] = field(default_factory=list)
     string_tables: list[StringTable] = field(default_factory=list)
     menus: list[Menu] = field(default_factory=list)
+    accelerators: list[AcceleratorTable] = field(default_factory=list)
     versions: list[VersionInfo] = field(default_factory=list)
     raw_blocks: list[RawBlock] = field(default_factory=list)
     directives: list[str] = field(default_factory=list)
@@ -253,6 +355,7 @@ class ResourceScript:
             "strings": sum(len(t.entries) for t in self.string_tables),
             "menus": len(self.menus),
             "menu_items": sum(1 for _ in self.menu_items()),
+            "accelerators": sum(len(t.entries) for t in self.accelerators),
             "version_values": sum(len(v.values) for v in self.versions),
             "raw_blocks": len(self.raw_blocks),
         }
@@ -260,3 +363,15 @@ class ResourceScript:
     def version_values(self) -> Iterator[VersionValue]:
         for version in self.versions:
             yield from version.values
+
+    def accelerator_for(self, symbol: str) -> Accelerator | None:
+        """The shortcut bound to a command id, across every table in the file.
+
+        Tables are searched in source order and the first hit wins, which is
+        also what the resource compiler does when a command appears twice.
+        """
+        for table in self.accelerators:
+            found = table.for_command(symbol)
+            if found is not None:
+                return found
+        return None

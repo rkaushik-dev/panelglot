@@ -102,6 +102,19 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
+// Accelerator
+//
+
+IDR_MAINFRAME ACCELERATORS
+BEGIN
+    "N",            ID_FILE_NEW,            VIRTKEY, CONTROL, NOINVERT
+    "^O",           ID_FILE_OPEN,           ASCII,  NOINVERT
+    VK_F5,          ID_DIAG_VERIFY,         VIRTKEY, NOINVERT
+    VK_DELETE,      ID_PRINTER_PURGE,       VIRTKEY, SHIFT, NOINVERT
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // String Table
 //
 

@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from ...errors import ParseError
 from .ast import (
+    Accelerator,
+    AcceleratorTable,
     Control,
     Dialog,
     Menu,
@@ -145,6 +147,10 @@ class _Parser:
             self.script.dialogs.append(self.parse_dialog(name_token.text, statement))
         elif upper in ("MENU", "MENUEX"):
             self.script.menus.append(self.parse_menu(name_token.text, statement))
+        elif upper == "ACCELERATORS":
+            self.script.accelerators.append(
+                self.parse_accelerators(name_token.text, statement)
+            )
         elif upper == "VERSIONINFO":
             self.script.versions.append(self.parse_version(name_token.text, statement))
         else:
@@ -451,6 +457,86 @@ class _Parser:
         _apply_geometry(control, groups, first=1)
         control.styles = _styles_from(groups, 5)
         return control
+
+    # -- accelerators ---------------------------------------------------
+
+    def parse_accelerators(self, name: str, statement: Token) -> AcceleratorTable:
+        """``<name> ACCELERATORS BEGIN <key>, <id>[, flags...] ... END``.
+
+        There is nothing translatable in here. It is read so that a menu item
+        advertising Ctrl+N can be checked against the key that actually fires,
+        which is the one thing about shortcuts that translation breaks.
+        """
+        table = AcceleratorTable(symbol=name, line=statement.line)
+
+        while not self.at_end() and self.current.line == statement.line:
+            self.advance()
+
+        self.expect(TokenKind.BEGIN)
+        while self.current.kind is not TokenKind.END:
+            if self.at_end():
+                raise self.fail("unterminated accelerator table")
+            entry = self.parse_accelerator()
+            if entry is not None:
+                table.entries.append(entry)
+        self.expect(TokenKind.END)
+
+        return table
+
+    def read_accelerator_row(self, line: int) -> list[Token]:
+        """Read one accelerator row, which is one line unless a comma trails.
+
+        The general statement reader cannot be used here. It decides that a
+        new line belongs to the previous statement unless it starts with a
+        known keyword, and every accelerator row starts with either a string
+        or a VK_ name, neither of which is a keyword. VK_F1 on its own line
+        would be read as a continuation of the row above it.
+        """
+        tokens: list[Token] = []
+        while not self.at_end():
+            token = self.current
+            if token.kind in (TokenKind.BEGIN, TokenKind.END, TokenKind.DIRECTIVE):
+                break
+            wrapped = bool(tokens) and tokens[-1].kind is TokenKind.COMMA
+            if token.line != line and not wrapped:
+                break
+            tokens.append(self.advance())
+            line = token.line
+        return tokens
+
+    def parse_accelerator(self) -> Accelerator | None:
+        """One row. Returns None for a row with nothing usable on it."""
+        start = self.current
+        row = self.read_accelerator_row(start.line)
+        if not row:
+            # Nothing consumable on this line, and the loop above has to move.
+            self.advance()
+            return None
+
+        groups = self.split_arguments(row)
+
+        if len(groups) < 2:
+            # A row the editor left half written. The resource compiler would
+            # reject it, but this tool is not the resource compiler and
+            # refusing to extract anything over it helps nobody.
+            return None
+
+        key_token = groups[0][0]
+        quoted = key_token.kind is TokenKind.STRING
+        key = str(key_token.value) if quoted else key_token.text
+
+        flags: list[str] = []
+        for group in groups[2:]:
+            flags.extend(token.text.upper() for token in group
+                         if token.kind is TokenKind.IDENT)
+
+        return Accelerator(
+            key=key,
+            symbol=_text_of(groups, 1),
+            flags=flags,
+            quoted=quoted,
+            line=start.line,
+        )
 
     # -- menus ----------------------------------------------------------
 

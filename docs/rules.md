@@ -75,6 +75,19 @@ names.
 Overriding one is allowed, but only by marking the entry `do-not-translate`
 first, which makes it deliberate and visible in review.
 
+## shortcuts
+
+The hint after the tab in a menu caption, as in `&New\tCtrl+N`.
+
+The modifiers move with the language and should: German writes Strg. The key
+at the end does not, because it is bound in the accelerator table, which is
+compiled once and is the same in every build. Changing N to U to match Neu
+produces a menu advertising a key that does nothing, and nothing else in the
+toolchain notices.
+
+Dropping the tab is also reported. The shortcut still works and the menu stops
+mentioning it, so nobody finds it.
+
 ## state
 
 The state of a translation rather than its content.
