@@ -18,14 +18,16 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 
 from ..config import ProjectConfig
 from ..emit.registry import available_kinds as emit_kinds
 from ..errors import ConfigError
 from ..glossary import load_glossary
 from ..layout.panels import font_for, get_panel, panel_names
-from ..rules.registry import build_rules
+from ..rules.registry import build_rules, known_rule_names
 from ..sources.registry import available_kinds as source_kinds
+from ..waivers import load_waivers
 from .build import is_inside, resolve_output_path
 
 __all__ = ["Finding", "DoctorReport", "run_doctor"]
@@ -79,6 +81,7 @@ def run_doctor(config: ProjectConfig) -> DoctorReport:
     _check_locales(config, report)
     _check_glossary(config, report)
     _check_rules(config, report)
+    _check_waivers(config, report)
     _check_outputs(config, report)
     _check_providers(config, report)
     _check_catalog(config, report)
@@ -246,6 +249,41 @@ def _check_rules(config: ProjectConfig, report: DoctorReport) -> None:
         return
 
     report.add("rules", True, f"{len(rules)} enabled, fail on {config.check.fail_on}")
+
+
+def _check_waivers(config: ProjectConfig, report: DoctorReport) -> None:
+    """The waiver file parses, names real rules, and has not expired."""
+    path = config.waivers_path()
+    if not path.exists():
+        return
+
+    try:
+        waivers = load_waivers(path)
+    except ConfigError as exc:
+        report.add("waivers", False, str(exc), remedy=f"Fix {path.name}.")
+        return
+
+    known = set(known_rule_names())
+    unknown = sorted({w.rule for w in waivers if w.rule not in known})
+    if unknown:
+        report.add(
+            "waivers", False, f"waives unknown rules: {', '.join(unknown)}",
+            remedy=f"Known rules: {', '.join(known_rule_names())}. A waiver on a "
+                   f"rule that does not exist suppresses nothing.",
+        )
+        return
+
+    today = date.today()
+    expired = [w for w in waivers if w.expired_on(today)]
+    if expired:
+        report.add(
+            "waivers", False, f"{len(expired)} have expired",
+            remedy="Renew them on purpose or delete them. " +
+                   "; ".join(w.describe() for w in expired),
+        )
+        return
+
+    report.add("waivers", True, f"{len(waivers)} accepted findings, none expired")
 
 
 def _check_outputs(config: ProjectConfig, report: DoctorReport) -> None:

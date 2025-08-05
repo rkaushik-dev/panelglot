@@ -35,13 +35,17 @@ FORMATS = ["text", "json", "junit", "html"]
 @click.option("--color/--no-color", "colour", default=None,
               help="Force colour on or off. Defaults to whether stdout is a "
                    "terminal, and NO_COLOR is always honoured.")
+@click.option("--no-waivers", is_flag=True,
+              help="Ignore waivers.toml and report everything, including the "
+                   "findings the team has accepted.")
 @pass_context
 def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: bool,
           fail_on: str | None, output_format: str, output: Path | None,
-          colour: bool | None) -> None:
+          colour: bool | None, no_waivers: bool) -> None:
     """Run every rule over the translated catalog."""
     config = context.config
-    result = check_project(config, locales=list(locales) or None)
+    result = check_project(config, locales=list(locales) or None,
+                           use_waivers=not no_waivers)
 
     for warning in result.warnings:
         context.warn(warning)

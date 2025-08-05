@@ -25,6 +25,7 @@ from ..layout.panels import Panel, font_for, get_panel
 from ..rules.base import RuleContext
 from ..rules.registry import build_rules
 from ..rules.result import Finding, Report, Severity
+from ..waivers import WaiverOutcome, apply_waivers, load_waivers
 from .analysis import analyse
 
 __all__ = ["CheckResult", "LocaleCheck", "check_project", "context_for_locale"]
@@ -64,11 +65,25 @@ class CheckResult:
     locales: list[LocaleCheck] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
+    waivers: WaiverOutcome | None = None
+    """What the waiver file did to this report, or None if there was no file.
+
+    The report above is the one after waiving, because everything downstream
+    wants the findings somebody still has to act on. The findings that were
+    accepted are here, and they are still real: a report that says nothing was
+    found when four things were waived is a report that lies.
+    """
+
     def should_fail(self, fail_on: str) -> bool:
         return self.report.should_fail(fail_on)
 
+    @property
+    def waived(self) -> list[Finding]:
+        return list(self.waivers.waived) if self.waivers else []
 
-def check_project(config: ProjectConfig, *, locales: list[str] | None = None) -> CheckResult:
+
+def check_project(config: ProjectConfig, *, locales: list[str] | None = None,
+                  use_waivers: bool = True) -> CheckResult:
     """Check every configured language, or only the ones named."""
     catalog = _load_catalog(config)
     glossary = load_glossary(config.root / config.glossary) if config.glossary else None
@@ -100,7 +115,28 @@ def check_project(config: ProjectConfig, *, locales: list[str] | None = None) ->
         result.locales.append(summary)
 
     result.report.checked = sum(check.translated for check in result.locales)
+
+    if use_waivers:
+        _apply_project_waivers(config, result)
+
     return result
+
+
+def _apply_project_waivers(config: ProjectConfig, result: CheckResult) -> None:
+    """Filter the report through the project's waiver file, if it has one.
+
+    Problems with the file itself come back as warnings on the result rather
+    than as findings. A waiver that expired last Tuesday is not a translation
+    problem, and putting it in the findings list would mean it could be waived.
+    """
+    waivers = load_waivers(config.waivers_path())
+    if not waivers:
+        return
+
+    outcome = apply_waivers(result.report, waivers)
+    result.report = outcome.report
+    result.waivers = outcome
+    result.warnings.extend(outcome.problems)
 
 
 def context_for_locale(config: ProjectConfig, entry: LocaleEntry,

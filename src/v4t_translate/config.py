@@ -187,11 +187,22 @@ class ProjectConfig:
     output_dir: Path = Path("out")
     protected_patterns: tuple[str, ...] = DEFAULT_PROTECTED_PATTERNS
     glossary: Path | None = None
+    waivers: Path = Path("waivers.toml")
     check: CheckSettings = field(default_factory=CheckSettings)
 
     def catalog_path(self) -> Path:
         """Where the source catalog for this project lives."""
         return self.root / self.catalog_dir / f"{_slug(self.name)}.json"
+
+    def waivers_path(self) -> Path:
+        """Where accepted findings are written down.
+
+        Defaulted rather than optional. A project that has never waived
+        anything has no file, which loads as an empty set, and the day
+        somebody needs one they should not also have to find out that a
+        config key exists.
+        """
+        return self.root / self.waivers
 
     def translations_path(self, tag: str) -> Path:
         return self.root / self.catalog_dir / f"{tag}.json"
@@ -268,6 +279,10 @@ def _build(raw: dict[str, Any], *, root: Path, origin: str) -> ProjectConfig:
     glossary = project.get("glossary")
     if glossary is not None:
         config.glossary = Path(str(glossary))
+
+    waivers = project.get("waivers")
+    if waivers is not None:
+        config.waivers = Path(str(waivers))
 
     protected = _table(raw, "protected", origin, required=False)
     extra = protected.get("patterns", [])

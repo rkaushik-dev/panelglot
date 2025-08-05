@@ -100,6 +100,13 @@ def format_check(result: CheckResult, *, limit: int = DEFAULT_LIMIT,
         format_report(result.report, limit=limit, show_detail=show_detail,
                       palette=palette)
     )
+
+    # Said after the summary rather than folded into it. A clean report with
+    # four waived findings behind it is not the same thing as a clean report,
+    # and the number is the only place anybody would notice it growing.
+    if result.waivers is not None and result.waivers.waived:
+        lines.append(palette.dim(result.waivers.summary()))
+
     return "\n".join(lines)
 
 

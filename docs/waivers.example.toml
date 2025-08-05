@@ -1,0 +1,32 @@
+# Findings we have looked at and decided to live with, for now.
+#
+# Every entry needs a rule, a reason, an owner and an until date. The date is
+# the point of the file. Without one this becomes a list of two hundred
+# suppressions that nobody can tell apart from a list of two hundred bugs.
+#
+# check reports a waiver the week before it expires, on the day it expires,
+# and on the day it stops matching anything. All three mean the same thing:
+# come back and look at this.
+
+[[waiver]]
+rule = "fitting"
+locale = "he-IL"
+reason = """
+Four strings on the maintenance page overflow by two pixels each on the
+480x272 panel. That panel is out of production and the last unit ships in
+March, so redoing the Hebrew for it is not worth anybody's afternoon.
+"""
+owner = "ming"
+until = 2025-09-30
+
+[[waiver]]
+rule = "glossary"
+locale = "tr-TR"
+key = "purge.7b21a4"
+reason = """
+The Turkish distributor uses their own word for purge and will not move.
+Written down here rather than in the glossary because it is their decision
+and not ours, and it should come back for review when the contract does.
+"""
+owner = "ming"
+until = 2025-12-31
