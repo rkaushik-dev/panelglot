@@ -25,12 +25,19 @@ from ..catalog.ids import normalize_source
 from ..catalog.store import Catalog, load_catalog, load_translations, save_translations
 from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
+from ..emit.xliff import read_xliff
 from ..errors import CatalogError, WorkbookError
 from ..locales import Locale
 from ..workbook.reader import WorkbookRead, WorkbookRow, read_workbook
 from ..workbook.writer import write_workbook
 
-__all__ = ["ExportResult", "ImportResult", "export_workbooks", "import_workbook"]
+__all__ = [
+    "ExportResult",
+    "ImportResult",
+    "export_workbooks",
+    "import_workbook",
+    "import_xliff_file",
+]
 
 
 @dataclass
@@ -145,6 +152,65 @@ def import_workbook(
             continue
 
         key = keys[0]
+        _apply(result, translations, catalog, key, row, approve=approve, today=today)
+
+    if not dry_run:
+        destination = config.translations_path(entry.tag)
+        save_translations(destination, translations)
+        result.written = destination
+
+    return result
+
+
+def import_xliff_file(
+    config: ProjectConfig,
+    path: Path | str,
+    *,
+    locale: str | None = None,
+    dry_run: bool = False,
+    approve: bool = True,
+    today: date | None = None,
+) -> ImportResult:
+    """Read an XLIFF file an agency delivered.
+
+    Nothing is matched by text here. The file that came back is the file that
+    went out, and every unit carries the message key it was written with, so a
+    unit either names a message this catalog has or it does not. That removes
+    the whole ambiguous case, which is the expensive half of a workbook
+    import.
+
+    The state attribute is believed where the agency set one. One of the three
+    leaves every unit on the state it was sent with, and for their deliveries
+    ``approve`` is what decides, exactly as it does for a legacy spreadsheet
+    with no status column.
+    """
+    catalog = _load_catalog(config)
+    delivered = read_xliff(Path(path).read_text(encoding="utf-8"), path=str(path))
+
+    tag = locale or delivered.locale
+    if not tag:
+        raise WorkbookError(
+            f"{path} has no target-language and no --locale was given, so there "
+            f"is nothing to say which language this is"
+        )
+
+    entry = config.locale_entry(tag)
+    translations = load_translations(config.translations_path(entry.tag))
+    result = ImportResult(locale=entry.tag, path=str(path))
+
+    for number, (key, incoming) in enumerate(sorted(delivered.entries.items()), start=1):
+        row = WorkbookRow(
+            row=number,
+            source=key,
+            target=incoming.text,
+            key=key,
+            status=str(incoming.state),
+        )
+
+        if key not in catalog.messages:
+            result.unmatched.append(row)
+            continue
+
         _apply(result, translations, catalog, key, row, approve=approve, today=today)
 
     if not dry_run:

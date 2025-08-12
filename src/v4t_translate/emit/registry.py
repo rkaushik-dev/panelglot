@@ -17,6 +17,7 @@ _BUILTINS = {
     "androidxml": ("v4t_translate.emit.androidxml", "AndroidXmlEmitter"),
     "cheader": ("v4t_translate.emit.cheader", "CHeaderEmitter"),
     "po": ("v4t_translate.emit.po", "PoEmitter"),
+    "xliff": ("v4t_translate.emit.xliff", "XliffEmitter"),
 }
 
 

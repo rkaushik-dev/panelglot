@@ -158,10 +158,11 @@ def test_the_file_is_utf8(tmp_path, catalog, translations):
 
 
 def test_the_registry_knows_every_emitter():
-    assert set(available_kinds()) == {"rc", "v4l", "androidxml", "cheader", "po"}
+    assert set(available_kinds()) == {"rc", "v4l", "androidxml", "cheader", "po",
+                                      "xliff"}
 
 
-@pytest.mark.parametrize("kind", ["rc", "v4l", "androidxml", "cheader", "po"])
+@pytest.mark.parametrize("kind", ["rc", "v4l", "androidxml", "cheader", "po", "xliff"])
 def test_each_emitter_satisfies_the_protocol(kind):
     emitter = get_emitter(kind)
     assert isinstance(emitter, Emitter)

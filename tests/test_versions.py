@@ -37,7 +37,8 @@ def test_what_it_reads(found):
 
 
 def test_what_it_writes(found):
-    assert set(found.outputs) == {"rc", "v4l", "androidxml", "cheader", "po"}
+    assert set(found.outputs) == {"rc", "v4l", "androidxml", "cheader", "po",
+                                  "xliff"}
 
 
 def test_the_rules_are_listed(found):

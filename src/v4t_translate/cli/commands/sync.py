@@ -7,10 +7,15 @@ from pathlib import Path
 import click
 
 from ...errors import CheckFailed
-from ...ops.sync import ImportResult, export_workbooks, import_workbook
+from ...ops.sync import (
+    ImportResult,
+    export_workbooks,
+    import_workbook,
+    import_xliff_file,
+)
 from ..context import Context, pass_context
 
-__all__ = ["export", "import_"]
+__all__ = ["export", "import_", "XLIFF_SUFFIXES"]
 
 
 @click.command()
@@ -32,22 +37,35 @@ def export(context: Context, locales: tuple[str, ...], outstanding: bool,
         context.say(f"{tag}: {rows} rows -> {path}")
 
 
+#: Suffixes that mean the delivery is XLIFF rather than a spreadsheet.
+XLIFF_SUFFIXES = (".xlf", ".xliff")
+
+
 @click.command("import")
-@click.argument("workbook", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-@click.option("--locale", "-l", help="Insist the sheet is this language.")
-@click.option("--sheet", help="Sheet name. Defaults to the first one.")
+@click.argument("delivery", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--locale", "-l", help="Insist the delivery is this language.")
+@click.option("--sheet", help="Sheet name. Defaults to the first one. Workbooks only.")
 @click.option("--dry-run", is_flag=True, help="Report what would change, write nothing.")
 @click.option("--draft", is_flag=True, help="Land rows as draft rather than approved.")
 @click.option("--strict", is_flag=True,
               help="Fail if any row matched nothing or matched more than one message.")
 @pass_context
-def import_(context: Context, workbook: Path, locale: str | None, sheet: str | None,
+def import_(context: Context, delivery: Path, locale: str | None, sheet: str | None,
             dry_run: bool, draft: bool, strict: bool) -> None:
-    """Read a delivered workbook back into the catalog."""
-    result = import_workbook(
-        context.config, workbook, locale=locale, sheet=sheet,
-        dry_run=dry_run, approve=not draft,
-    )
+    """Read a delivered workbook or XLIFF file back into the catalog."""
+    if delivery.suffix.lower() in XLIFF_SUFFIXES:
+        if sheet is not None:
+            context.warn("--sheet means nothing for an XLIFF delivery, ignored")
+        result = import_xliff_file(
+            context.config, delivery, locale=locale,
+            dry_run=dry_run, approve=not draft,
+        )
+    else:
+        result = import_workbook(
+            context.config, delivery, locale=locale, sheet=sheet,
+            dry_run=dry_run, approve=not draft,
+        )
+
     report(context, result, dry_run=dry_run)
 
     if strict and not result.is_clean():
@@ -64,6 +82,13 @@ def report(context: Context, result: ImportResult, *, dry_run: bool) -> None:
 
     for row in result.unmatched:
         context.warn(f"row {row.row}: {row.source!r} matches no message, ignored")
+
+    if result.unmatched:
+        context.say(
+            "A delivery is made against a catalog. Rows that match nothing are "
+            "usually strings that were removed after it went out.",
+            level=1,
+        )
 
     for row, keys in result.ambiguous:
         context.warn(
