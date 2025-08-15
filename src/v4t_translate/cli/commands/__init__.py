@@ -16,6 +16,7 @@ from .extract import extract
 from .font import font
 from .init import init
 from .inspect import diff, doctor, prune, stats, verify
+from .status import status
 from .sync import export, import_
 from .translate import memory, pretranslate
 
@@ -24,6 +25,7 @@ __all__ = ["COMMANDS", "register"]
 #: Commands in the order a person meets them.
 COMMANDS: tuple[click.Command, ...] = (
     init,
+    status,
     extract,
     check,
     export,
