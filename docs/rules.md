@@ -141,11 +141,33 @@ Whole word in the source so `pen` does not fire on `open`. Substring in the
 target because German compounds and `Druckkopfspannung` is the right
 translation of `printhead voltage`.
 
+The three below are analyses rather than rules. They need the whole language
+at once, so they cannot be rules, which see one message. They are named,
+disabled, promoted and demoted exactly like a rule, and they land in the same
+report, because that distinction is ours and not the reader's.
+
 ## collisions
 
-Not a rule, because these need to see more than one message. Reported under
-the same name and disabled the same way.
+Two controls on one dialog claiming the same Alt key.
 
-Two controls on one dialog claiming the same Alt key. Two different English
-strings coming back with one translation. A translation identical to its
-English, which is usually a skipped row.
+Alt+D on a dialog with two D-marked buttons presses one of them and nobody can
+predict which. Invisible until somebody drives the panel from the keyboard,
+which on a production line is most of the time. The English is nearly always
+fine, because whoever laid the dialog out could see all of it and a translator
+sees one string at a time.
+
+## untranslated
+
+A translation that is character for character the English.
+
+Correct for OK and Barcode, wrong for everything else, and the ratio between
+the two is what says whether a delivery was done or whether somebody copied
+the source column across. Protected messages are excluded, and so is a short
+list of words that genuinely do not move.
+
+## merged
+
+Two different English strings that came back as one.
+
+Sometimes right and often a lost distinction. `Print` the button and `Print`
+the menu heading are one word in English and two in German.

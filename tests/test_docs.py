@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from v4t_translate.analyses.registry import analysis_names
 from v4t_translate.catalog.store import FORMAT_VERSION
 from v4t_translate.catalog.translations import TranslationState
 from v4t_translate.emit.v4l import (
@@ -29,7 +30,7 @@ from v4t_translate.emit.v4l import (
     FORMAT_VERSION as V4L_VERSION,
 )
 from v4t_translate.layout.panels import panel_names
-from v4t_translate.rules.registry import ANALYSIS_RULES, rule_names
+from v4t_translate.rules.registry import rule_names
 
 DOCS = Path(__file__).resolve().parents[1] / "docs"
 
@@ -72,12 +73,12 @@ def test_every_rule_has_a_section(rules_doc):
 
 def test_the_analyses_have_a_section_too(rules_doc):
     documented = set(headings(rules_doc))
-    for name in ANALYSIS_RULES:
+    for name in analysis_names():
         assert name in documented
 
 
 def test_nothing_is_documented_that_does_not_exist(rules_doc):
-    known = set(rule_names()) | set(ANALYSIS_RULES)
+    known = set(rule_names()) | set(analysis_names())
     assert set(headings(rules_doc)) <= known
 
 
@@ -88,7 +89,7 @@ def test_the_rules_are_documented_in_report_order(rules_doc):
 
 def test_the_config_example_uses_real_rule_names(rules_doc):
     block = rules_doc.split("```toml", 1)[1].split("```", 1)[0]
-    known = set(rule_names()) | set(ANALYSIS_RULES)
+    known = set(rule_names()) | set(analysis_names())
 
     # Only the bracketed lists hold rule names. fail_on takes a severity.
     named = [

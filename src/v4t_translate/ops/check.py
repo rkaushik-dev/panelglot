@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..analyses.registry import build_analyses
 from ..catalog.store import Catalog, load_catalog, load_translations
 from ..catalog.translations import TranslationSet
 from ..config import LocaleEntry, ProjectConfig
@@ -24,9 +25,8 @@ from ..layout.font import FontMetrics
 from ..layout.panels import Panel, font_for, get_panel
 from ..rules.base import RuleContext
 from ..rules.registry import build_rules
-from ..rules.result import Finding, Report, Severity
+from ..rules.result import Finding, Report
 from ..waivers import WaiverOutcome, apply_waivers, load_waivers
-from .analysis import analyse
 
 __all__ = ["CheckResult", "LocaleCheck", "check_project", "context_for_locale"]
 
@@ -88,6 +88,7 @@ def check_project(config: ProjectConfig, *, locales: list[str] | None = None,
     catalog = _load_catalog(config)
     glossary = load_glossary(config.root / config.glossary) if config.glossary else None
     rules = build_rules(config.check)
+    analyses = build_analyses(config.check)
 
     wanted = _select(config, locales)
     result = CheckResult(report=Report(), catalog=catalog)
@@ -111,7 +112,7 @@ def check_project(config: ProjectConfig, *, locales: list[str] | None = None,
             )
 
         _check_locale(catalog, translations, context, rules, result.report, summary)
-        _analyse_locale(catalog, translations, context, config, result.report)
+        _analyse_locale(catalog, translations, context, analyses, result.report)
         result.locales.append(summary)
 
     result.report.checked = sum(check.translated for check in result.locales)
@@ -187,55 +188,15 @@ def _check_locale(catalog: Catalog, translations: TranslationSet, context: RuleC
 
 
 def _analyse_locale(catalog: Catalog, translations: TranslationSet,
-                    context: RuleContext, config: ProjectConfig,
-                    report: Report) -> None:
+                    context: RuleContext, analyses, report: Report) -> None:
     """Add the whole-language findings to the same report as the rules.
 
-    They are separate operations because they need different inputs, but a
-    person reading the output does not care about that distinction and having
-    to run two commands to see everything is how findings get missed.
+    They are a separate kind of check because they need a different input, but
+    a person reading the output does not care about that distinction and
+    having to run two commands to see everything is how findings get missed.
     """
-    if not config.check.is_enabled("collisions"):
-        return
-
-    result = analyse(catalog, translations, context.locale)
-
-    for collision in result.collisions:
-        report.add(Finding(
-            rule="collisions",
-            severity=Severity.ERROR,
-            locale=context.tag,
-            key=collision.keys[0],
-            summary=f"Alt+{collision.mnemonic} is claimed by "
-                    f"{len(collision.keys)} controls on {collision.container}",
-            detail=collision.describe(),
-            origin=collision.container,
-        ))
-
-    for merge in result.merged:
-        report.add(Finding(
-            rule="collisions",
-            severity=Severity.WARNING,
-            locale=context.tag,
-            key=merge.keys[0],
-            summary=f"{len(merge.sources)} different English strings share the "
-                    f"translation {merge.target!r}",
-            detail=merge.describe(),
-        ))
-
-    for key in result.unchanged:
-        message = catalog.messages[key]
-        report.add(Finding(
-            rule="collisions",
-            severity=Severity.WARNING,
-            locale=context.tag,
-            key=key,
-            summary="translation is identical to the English",
-            source_text=message.source_text,
-            translated_text=message.source_text,
-            detail="Either it was skipped, or it genuinely does not change and "
-                   "should be marked do-not-translate.",
-        ))
+    for analysis in analyses:
+        report.extend(list(analysis.run(catalog, translations, context)))
 
 
 def _select(config: ProjectConfig, locales: list[str] | None) -> list[LocaleEntry]:

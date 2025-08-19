@@ -29,18 +29,12 @@ from .state import StateRule
 
 __all__ = [
     "ALL_RULES",
-    "ANALYSIS_RULES",
     "rule_names",
     "known_rule_names",
     "build_rules",
     "SeverityOverride",
 ]
 
-#: Names that are not rules but can be disabled like one. These are the
-#: whole-language analyses in :mod:`v4t_translate.ops.analysis`, which cannot
-#: be Rules because a Rule only ever sees one message. They still have to be
-#: nameable in config, or "disable = [collisions]" would be rejected.
-ANALYSIS_RULES: tuple[str, ...] = ("collisions",)
 
 class RuleType(Protocol):
     """The class object of a rule.
@@ -112,8 +106,19 @@ def rule_names() -> list[str]:
 
 
 def known_rule_names() -> list[str]:
-    """Everything a project may name in disable, promote or demote."""
-    return [*rule_names(), *ANALYSIS_RULES]
+    """Everything a project may name in disable, promote or demote.
+
+    Rules and analyses are one namespace as far as config is concerned. They
+    are different kinds of thing internally, because one sees a message and
+    the other sees a language, and nobody writing a config file cares.
+
+    Imported here rather than at module scope: the analyses import this module
+    for its Severity re-export and the rule protocol, so importing them back
+    at the top would close the loop.
+    """
+    from ..analyses.registry import analysis_names
+
+    return [*rule_names(), *analysis_names()]
 
 
 def build_rules(settings: CheckSettings | None = None) -> list[Rule]:
