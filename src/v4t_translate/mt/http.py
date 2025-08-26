@@ -39,6 +39,7 @@ from typing import Any
 from ..errors import ConfigError
 from ..locales import Locale
 from .base import ProviderResult, protect_placeholders, restore_placeholders
+from .retry import RateLimiter, RetryPolicy, with_retries
 
 __all__ = ["HttpProviderConfig", "HttpProvider", "target_code", "extract_path"]
 
@@ -84,6 +85,19 @@ class HttpProviderConfig:
     timeout: float = 20.0
     extra: dict[str, Any] = field(default_factory=dict)
     """Fields sent with every request, for the ones that want a model name."""
+
+    attempts: int = 3
+    """Tries per batch, including the first. 1 turns retrying off."""
+
+    requests_per_second: float = 0.0
+    """Ceiling on the request rate. 0 means no limit.
+
+    Set it below whatever the plan allows. The free DeepL tier answers 429
+    above a handful a second, and the point of this is never to see one.
+    """
+
+    def retry_policy(self) -> RetryPolicy:
+        return RetryPolicy(attempts=max(1, self.attempts))
 
     def token(self) -> str:
         """The key, out of the environment. Never out of the config."""
@@ -135,12 +149,17 @@ def extract_path(payload: Any, path: str) -> list[str]:
 class HttpProvider:
     """Talks to whatever the configuration describes."""
 
-    def __init__(self, config: HttpProviderConfig, *, opener=None) -> None:
+    def __init__(self, config: HttpProviderConfig, *, opener=None,
+                 sleeper=None) -> None:
         self.config = config
         self.name = config.name
-        # Injected so the tests never touch a network. A provider that can
-        # only be tested against a live endpoint is a provider nobody tests.
+        # Injected so the tests never touch a network, and never wait. A
+        # provider that can only be tested against a live endpoint is a
+        # provider nobody tests, and one that sleeps for real turns a retry
+        # test into a slow one.
         self._opener = opener or urllib.request.urlopen
+        self._sleeper = sleeper
+        self._limiter = RateLimiter(config.requests_per_second, sleeper=sleeper)
 
     def translate(self, texts: list[str], source: Locale,
                   target: Locale) -> ProviderResult:
@@ -152,15 +171,27 @@ class HttpProvider:
         # arriving as a warning on every batch. A key that is not set is
         # something to fix, not a transient failure to work around.
         headers = self._headers()
+        policy = self.config.retry_policy()
 
         for batch in _batched(texts, self.config.batch_size):
             protected: list[tuple[str, list[str]]] = [
                 protect_placeholders(text) for text in batch
             ]
+            sent = [text for text, _ in protected]
+
+            def attempt(sent: list[str] = sent) -> list[str]:
+                return self._call(sent, source, target, headers)
 
             try:
-                answers = self._call([text for text, _ in protected], source, target,
-                                     headers)
+                answers = with_retries(
+                    attempt, policy,
+                    limiter=self._limiter,
+                    sleeper=self._sleeper,
+                    on_retry=lambda n, delay, exc: result.warnings.append(
+                        f"{self.name}: {exc}, retrying in {delay:.1f}s "
+                        f"(attempt {n} of {policy.attempts})"
+                    ),
+                )
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 result.warnings.append(f"{self.name}: {exc}")
                 result.texts.extend([""] * len(batch))
