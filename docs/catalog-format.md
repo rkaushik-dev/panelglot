@@ -11,9 +11,10 @@ Every message the sources produce.
 
 ```json
 {
-  "format": 1,
+  "format": 2,
   "project": "V4T-TIJ",
   "source_locale": "en-US",
+  "sources": ["src/V4T.rc"],
   "messages": [
     {
       "key": "bar-height.9f2c1a",
@@ -21,7 +22,7 @@ Every message the sources produce.
       "max_width_px": 54,
       "origins": [
         {
-          "source": "src/V4T.rc",
+          "src": 0,
           "kind": "dialog-control",
           "container": "IDD_BARCODE_PROPS",
           "symbol": "IDC_STATIC",
@@ -36,6 +37,27 @@ Every message the sources produce.
 
 Defaults are left out. A message with no context, no note, nothing protected
 and one line writes none of those fields.
+
+### The source table
+
+`src` is an index into `sources`, which lists each file once in the order it
+was first seen. First seen rather than sorted, so renaming one file does not
+reshuffle every other index.
+
+Format 1 wrote the path inline as `source` on every origin. That is still read,
+so an older catalog loads without conversion, and a `source` string wins over
+an `src` index if a hand-edited file somehow has both.
+
+The reason is diffs rather than size, though it does roughly halve the file.
+Moving one `.rc` used to rewrite a line under every message that came from it,
+so reviewing a six line change meant reading four thousand lines of noise.
+
+## The version numbers
+
+The catalog and the per-locale files carry separate `format` numbers, and they
+move separately. The catalog is at 2 and the translation files are still at 1,
+because their shape has not changed and bumping it would stop an older build
+reading a file it understands perfectly well.
 
 ### The key
 

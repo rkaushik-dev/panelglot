@@ -155,6 +155,12 @@ def test_the_catalog_format_version_matches(catalog_doc):
     assert f'"format": {FORMAT_VERSION}' in catalog_doc
 
 
+def test_the_translation_format_version_matches(catalog_doc):
+    from v4t_translate.catalog.store import TRANSLATIONS_VERSION
+
+    assert f'"format": {TRANSLATIONS_VERSION}' in catalog_doc
+
+
 def test_the_catalog_example_parses_as_json(catalog_doc):
     import json
 
