@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 
+from ...ops.estimate import estimate_project
 from ...ops.memory import (
     absorb_catalog,
     absorb_tmx,
@@ -22,7 +23,7 @@ __all__ = ["pretranslate", "memory"]
 
 
 @click.command()
-@click.argument("locale")
+@click.argument("locale", required=False)
 @click.option("--provider", "-p",
               help="Machine translation provider for what memory cannot fill. "
                    "Built in: passthrough, pseudo.")
@@ -31,10 +32,26 @@ __all__ = ["pretranslate", "memory"]
 @click.option("--threshold", type=float, default=0.75, show_default=True,
               help="How close a fuzzy memory match has to be.")
 @click.option("--dry-run", is_flag=True, help="Report what would change, write nothing.")
+@click.option("--estimate", is_flag=True,
+              help="Count what would be posted and stop. Every language unless "
+                   "one is named.")
+@click.option("--rate", type=float, default=0.0,
+              help="Price per million characters, to turn the count into money. "
+                   "Yours to supply: every engine prices differently and a "
+                   "number baked in here would be wrong within a quarter.")
 @pass_context
-def pretranslate(context: Context, locale: str, provider: str | None,
-                 trust_memory: bool, threshold: float, dry_run: bool) -> None:
+def pretranslate(context: Context, locale: str | None, provider: str | None,
+                 trust_memory: bool, threshold: float, dry_run: bool,
+                 estimate: bool, rate: float) -> None:
     """Fill one language from translation memory, and optionally a provider."""
+    if estimate:
+        _estimate(context, [locale] if locale else None, rate)
+        return
+
+    if locale is None:
+        raise click.UsageError("which language? pretranslate takes one, "
+                               "or use --estimate for all of them")
+
     result = pretranslate_project(
         context.config, locale, provider=provider, trust_memory=trust_memory,
         threshold=threshold, dry_run=dry_run,
@@ -50,6 +67,21 @@ def pretranslate(context: Context, locale: str, provider: str | None,
 
     if dry_run:
         context.say("dry run, nothing written")
+
+
+def _estimate(context: Context, locales: list[str] | None, rate: float) -> None:
+    """Count what a run would post, and say it before anybody spends it."""
+    result = estimate_project(context.config, locales=locales)
+
+    for entry in result.locales:
+        context.say(entry.describe(result.batch_size))
+
+    context.say("")
+    context.say(result.summary())
+
+    if rate > 0:
+        context.say(f"at {rate:g} per million characters, that is "
+                    f"{result.cost(rate):.2f}")
 
 
 @click.group()
