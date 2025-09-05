@@ -22,7 +22,15 @@ from collections.abc import Iterable
 
 from ..catalog.model import Message
 from ..catalog.translations import Translation
-from ..layout.bidi import MARKS, RLM, has_mixed_direction, needs_isolation
+from ..layout.bidi import (
+    MARKS,
+    RLM,
+    has_mixed_direction,
+    needs_isolation,
+    suggest_marks,
+    unbalanced_brackets,
+    visual_order,
+)
 from ..layout.measure import drawn_text
 from .base import RuleContext, finding
 from .result import Finding, Severity
@@ -60,14 +68,52 @@ class DirectionRule:
         if not has_mixed_direction(text):
             return
 
+        yield from self._brackets(text, message, translation, context)
+
         if needs_isolation(text):
             yield finding(
                 self, context, message, translation,
                 "mixes directions with no directional mark",
-                detail=f"Punctuation at the boundary will be drawn at the far end "
-                       f"of the line. Put U+200F before or after the embedded run. "
-                       f"The source is {message.source_text!r}.",
+                detail=self._explain(text, message.source_text),
             )
+
+    def _brackets(self, text: str, message: Message, translation: Translation,
+                  context: RuleContext) -> Iterable[Finding]:
+        """Brackets that do not pair up in a language that mirrors them."""
+        wrong = unbalanced_brackets(text)
+        if not wrong:
+            return
+
+        yield finding(
+            self, context, message, translation,
+            f"has {len(wrong)} bracket that does not pair up"
+            if len(wrong) == 1 else
+            f"has {len(wrong)} brackets that do not pair up",
+            detail="The panel mirrors brackets when it draws right to left, so "
+                   "one typed the other way round comes out mirrored twice. That "
+                   "reads as backwards rather than as a missing bracket, which is "
+                   "why nobody goes looking for the missing bracket.",
+            severity=Severity.ERROR,
+        )
+
+    @staticmethod
+    def _explain(text: str, source: str) -> str:
+        """The finding's second line, with a string that would work.
+
+        Showing the fix rather than describing it. Telling somebody their
+        colon will draw at the far end of the line and leaving them to work
+        out where a mark goes is most of a report and none of the help.
+
+        The suggestion is quoted with repr on purpose. A directional mark is
+        invisible, and a report that prints one is a report that looks like
+        it printed the same string twice.
+        """
+        return (
+            f"Punctuation at the boundary will be drawn at the far end of the "
+            f"line. On the panel this reads as {visual_order(text)!r}. Try "
+            f"{suggest_marks(text)!r}, which puts U+200F at the boundary. "
+            f"The source is {source!r}."
+        )
 
     @staticmethod
     def suggested_mark() -> str:
