@@ -77,6 +77,7 @@ def write_workbook(
     only_outstanding: bool = False,
     with_instructions: bool = True,
     previous: Catalog | None = None,
+    keys: set[str] | None = None,
 ) -> int:
     """Write the sheet for one language. Returns how many rows it holds.
 
@@ -91,6 +92,11 @@ def write_workbook(
     that are new or whose English has moved since then get their own colour,
     which is the difference between "here are nine hundred rows" and "here
     are the eleven that changed".
+
+    ``keys`` restricts the sheet to part of the catalog, which is how one
+    language gets split across two translators. The sheet is otherwise
+    identical, and the key column means the halves merge back on import
+    without anybody reconciling anything.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,6 +112,8 @@ def write_workbook(
         message = catalog.messages[key]
         translation = translations.get(key)
 
+        if keys is not None and key not in keys:
+            continue
         if only_outstanding and translation.state is TranslationState.APPROVED:
             continue
 

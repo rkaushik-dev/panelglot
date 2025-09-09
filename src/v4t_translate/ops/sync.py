@@ -37,6 +37,7 @@ __all__ = [
     "export_workbooks",
     "import_workbook",
     "import_xliff_file",
+    "split_by_container",
 ]
 
 
@@ -82,36 +83,90 @@ class ImportResult:
         return not (self.unmatched or self.ambiguous)
 
 
+def split_by_container(catalog: Catalog, parts: int) -> list[set[str]]:
+    """Divide the catalog into ``parts``, keeping each dialog whole.
+
+    Splitting by row count would put half of a dialog in one translator's
+    sheet and half in another's, and the whole reason a dialog is worth
+    keeping together is that its labels have to agree with each other and its
+    Alt keys have to be distinct. Two people cannot do that between them.
+
+    So the unit is the container, and the parts come out uneven. A dialog with
+    ninety strings is one person's afternoon whatever else is in the sheet.
+    """
+    if parts < 2:
+        return [set(catalog.messages)]
+
+    groups: dict[str, list[str]] = {}
+    for key in catalog.sorted_keys():
+        origin = catalog.messages[key].primary_origin
+        container = origin.container if origin else ""
+        groups.setdefault(container or "(loose strings)", []).append(key)
+
+    # Biggest first into whichever part is currently smallest. Not optimal
+    # packing, and it does not need to be: the point is that nobody ends up
+    # with four hundred strings while somebody else has thirty.
+    buckets: list[set[str]] = [set() for _ in range(parts)]
+    for _, keys in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0])):
+        smallest = min(buckets, key=len)
+        smallest.update(keys)
+
+    return buckets
+
+
 def export_workbooks(
     config: ProjectConfig,
     *,
     locales: list[str] | None = None,
     only_outstanding: bool = False,
     since: Path | str | None = None,
+    parts: int = 1,
 ) -> ExportResult:
-    """Write one workbook per language.
+    """Write one workbook per language, or ``parts`` of one.
 
     ``since`` is a saved catalog, usually the copy that went out with the last
     round. Rows that are new or whose space has moved since then are coloured,
     which turns "here are nine hundred rows again" into "here are the eleven
     that changed".
+
+    ``parts`` splits a language across several sheets so two people can work
+    on it at once. Nothing needs reconciling afterwards: every row carries its
+    key, so importing both halves in either order lands them in the same
+    place.
     """
     catalog = _load_catalog(config)
     previous = load_catalog(since) if since is not None else None
     result = ExportResult()
 
+    buckets = split_by_container(catalog, parts)
+
     for tag in locales or config.target_tags():
         entry = config.locale_entry(tag)
         translations = load_translations(config.translations_path(entry.tag))
-        path = config.workbook_path(entry.tag)
-        rows = write_workbook(
-            path, catalog, translations, entry.locale,
-            only_outstanding=only_outstanding,
-            previous=previous,
-        )
-        result.written.append((entry.tag, path, rows))
+
+        for number, keys in enumerate(buckets, start=1):
+            path = _part_path(config.workbook_path(entry.tag), number, len(buckets))
+            rows = write_workbook(
+                path, catalog, translations, entry.locale,
+                only_outstanding=only_outstanding,
+                previous=previous,
+                keys=None if len(buckets) == 1 else keys,
+            )
+            result.written.append((entry.tag, path, rows))
 
     return result
+
+
+def _part_path(path: Path, number: int, total: int) -> Path:
+    """Where part ``number`` of ``total`` goes.
+
+    An unsplit export keeps the name it always had. A file that grew a
+    "part 1 of 1" suffix the day this landed would be a file every existing
+    script stopped finding.
+    """
+    if total < 2:
+        return path
+    return path.with_name(f"{path.stem} - part {number} of {total}{path.suffix}")
 
 
 def import_workbook(

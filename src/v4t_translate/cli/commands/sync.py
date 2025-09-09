@@ -25,16 +25,31 @@ __all__ = ["export", "import_", "XLIFF_SUFFIXES"]
               help="Leave out anything already approved. For a follow-up round.")
 @click.option("--since", type=click.Path(exists=True, dir_okay=False, path_type=Path),
               help="A saved catalog. Rows that changed since it are coloured.")
+@click.option("--parts", type=int, default=1, show_default=True,
+              help="Split each language across this many sheets, keeping every "
+                   "dialog whole. They merge back on import.")
 @pass_context
 def export(context: Context, locales: tuple[str, ...], outstanding: bool,
-           since: Path | None) -> None:
+           since: Path | None, parts: int) -> None:
     """Write the workbook a translator gets sent."""
+    if parts < 1:
+        raise click.UsageError("--parts has to be at least 1")
+
     result = export_workbooks(
         context.config, locales=list(locales) or None, only_outstanding=outstanding,
-        since=since,
+        since=since, parts=parts,
     )
     for tag, path, rows in result.written:
         context.say(f"{tag}: {rows} rows -> {path}")
+
+    if parts > 1:
+        context.say(
+            "Parts are split by dialog, so they come out uneven. A dialog is "
+            "one person's afternoon: its labels have to agree with each other "
+            "and its Alt keys have to be distinct, and two people cannot do "
+            "that between them.",
+            level=1,
+        )
 
 
 #: Suffixes that mean the delivery is XLIFF rather than a spreadsheet.
