@@ -32,9 +32,15 @@ def build(context: Context, locales: tuple[str, ...], dry_run: bool,
     config = context.config
 
     if not no_check:
-        check_before_build(config, locales=wanted)
+        with context.step("check-before-build"):
+            check_before_build(config, locales=wanted)
 
-    result = build_project(config, locales=wanted, dry_run=dry_run)
+    with context.step("build", dry_run=dry_run) as fields:
+        result = build_project(config, locales=wanted, dry_run=dry_run)
+        fields["outputs"] = len(result.outputs)
+        fields["bytes"] = result.total_bytes
+        fields["locales"] = len(result.locales())
+
     report(context, result, dry_run=dry_run)
 
     if manifest_path is None or dry_run:

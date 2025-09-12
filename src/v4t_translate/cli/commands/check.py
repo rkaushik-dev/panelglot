@@ -39,8 +39,13 @@ def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: boo
           colour: bool | None, no_waivers: bool) -> None:
     """Run every rule over the translated catalog."""
     config = context.config
-    result = check_project(config, locales=list(locales) or None,
-                           use_waivers=not no_waivers)
+
+    with context.step("check", locales=len(locales) or len(config.locales)) as fields:
+        result = check_project(config, locales=list(locales) or None,
+                               use_waivers=not no_waivers)
+        fields["findings"] = len(result.report)
+        fields["errors"] = len(result.report.errors)
+        fields["checked"] = result.report.checked
 
     for warning in result.warnings:
         context.warn(warning)

@@ -18,8 +18,13 @@ __all__ = ["extract"]
 @pass_context
 def extract(context: Context, dry_run: bool, keep_going: bool, no_cache: bool) -> None:
     """Read every source and update the catalog."""
-    result = extract_project(context.config, dry_run=dry_run, keep_going=keep_going,
-                             use_cache=not no_cache)
+    with context.step("extract", cached=not no_cache) as fields:
+        result = extract_project(context.config, dry_run=dry_run,
+                                 keep_going=keep_going, use_cache=not no_cache)
+        fields["messages"] = result.message_count
+        fields["sources"] = len(result.stats_by_source())
+        fields["skipped"] = len(result.skipped)
+
     report(context, result, dry_run=dry_run)
 
 

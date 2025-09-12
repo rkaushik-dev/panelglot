@@ -20,6 +20,7 @@ from pathlib import Path
 
 import click
 
+from ..diagnostics import Diagnostics, path_from_environment
 from ..errors import V4TError
 from ..versions import describe
 from .commands import register
@@ -68,11 +69,23 @@ def _version(ctx: click.Context, param: click.Parameter, value: bool) -> None:
 @click.option("--verbose", "-v", count=True, help="More detail. Repeatable.")
 @click.option("--quiet", "-q", is_flag=True, help="Only errors.")
 @click.option("--traceback", is_flag=True, help="Show the traceback on failure.")
+@click.option("--log-file", type=click.Path(dir_okay=False, path_type=Path),
+              help="Append a JSON line per step. For the runs nobody watches. "
+                   "V4T_LOG in the environment does the same thing.")
+@click.option("--timings", is_flag=True,
+              help="Print where the time went when the command finishes.")
 @click.pass_context
 def main(ctx: click.Context, config_path: Path | None, verbose: int, quiet: bool,
-         traceback: bool) -> None:
+         traceback: bool, log_file: Path | None, timings: bool) -> None:
     """Localisation toolchain for the V4T coder family."""
-    ctx.obj = Context(config_path, verbose, quiet, traceback)
+    context = Context(config_path, verbose, quiet, traceback,
+                      diagnostics=Diagnostics(log_file or path_from_environment()),
+                      timings=timings)
+    ctx.obj = context
+
+    # Closed on the way out however the command ended, including the failures,
+    # which are the ones the log is for.
+    ctx.call_on_close(context.finish)
 
 
 register(main)
