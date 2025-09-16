@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 
 from ...errors import CheckFailed
-from ...ops.check import check_project
+from ...ops.check import changed_keys, check_project
 from ...report.console import DEFAULT_LIMIT
 from ...report.registry import format_names, get_format, render_check
 from ..context import Context, pass_context
@@ -33,16 +33,25 @@ __all__ = ["check"]
 @click.option("--no-waivers", is_flag=True,
               help="Ignore waivers.toml and report everything, including the "
                    "findings the team has accepted.")
+@click.option("--since", type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="A saved catalog. Only report on messages that are new or "
+                   "different since it. For a review.")
 @pass_context
 def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: bool,
           fail_on: str | None, output_format: str, output: Path | None,
-          colour: bool | None, no_waivers: bool) -> None:
+          colour: bool | None, no_waivers: bool, since: Path | None) -> None:
     """Run every rule over the translated catalog."""
     config = context.config
 
+    only = None
+    if since is not None:
+        only = changed_keys(config, since)
+        context.say(f"{len(only)} messages are new or different since "
+                    f"{since.name}", level=1)
+
     with context.step("check", locales=len(locales) or len(config.locales)) as fields:
         result = check_project(config, locales=list(locales) or None,
-                               use_waivers=not no_waivers)
+                               use_waivers=not no_waivers, only_keys=only)
         fields["findings"] = len(result.report)
         fields["errors"] = len(result.report.errors)
         fields["checked"] = result.report.checked

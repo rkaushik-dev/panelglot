@@ -28,7 +28,13 @@ from ..config import ProjectConfig
 from ..errors import CatalogError
 from .stats import count_words
 
-__all__ = ["MessageChange", "CatalogDiff", "diff_catalogs", "diff_against"]
+__all__ = [
+    "MessageChange",
+    "CatalogDiff",
+    "diff_catalogs",
+    "diff_against",
+    "diff_to_json",
+]
 
 
 @dataclass(frozen=True)
@@ -139,6 +145,38 @@ def diff_against(config: ProjectConfig, previous: Path | str) -> CatalogDiff:
     if not current.exists():
         raise CatalogError(f"{current} does not exist. Run extract first.")
     return diff_catalogs(load_catalog(previous), load_catalog(current))
+
+
+def diff_to_json(diff: CatalogDiff, *, indent: int = 2) -> str:
+    """The diff for something that has to decide rather than read.
+
+    The review bot wants the key list and the counts. It is the same shape as
+    the console report and not a reduction of it: a format that drops a field
+    is a format somebody works around by parsing the console output, and then
+    the console output cannot change.
+    """
+    import json
+
+    payload = {
+        "added": [_message_json(m) for m in diff.added],
+        "changed": [
+            {"key": c.key, "text": c.text, "reasons": list(c.reasons)}
+            for c in diff.changed
+        ],
+        "removed": [_message_json(m) for m in diff.removed],
+        "unchanged": diff.unchanged,
+        "needsAttention": diff.needs_attention,
+        "addedWords": diff.added_words,
+    }
+    return json.dumps(payload, indent=indent, ensure_ascii=False) + "\n"
+
+
+def _message_json(message: Message) -> dict[str, object]:
+    return {
+        "key": message.key,
+        "text": message.source_text,
+        "words": count_words(message.source_text),
+    }
 
 
 def outstanding_after(config: ProjectConfig, diff: CatalogDiff,

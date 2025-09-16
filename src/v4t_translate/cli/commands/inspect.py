@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 
 from ...errors import CheckFailed
-from ...ops.diff import diff_against, outstanding_after
+from ...ops.diff import diff_against, diff_to_json, outstanding_after
 from ...ops.doctor import run_doctor
 from ...ops.prune import prune_project
 from ...ops.stats import project_stats
@@ -67,10 +67,17 @@ def stats(context: Context, locales: tuple[str, ...], worst_first: bool) -> None
 @click.argument("previous",
                 type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--locale", "-l", help="Also report what is still unanswered here.")
+@click.option("--json", "as_json", is_flag=True,
+              help="Machine readable, for a review bot.")
 @pass_context
-def diff(context: Context, previous: Path, locale: str | None) -> None:
+def diff(context: Context, previous: Path, locale: str | None,
+         as_json: bool) -> None:
     """Say what changed since a saved copy of the catalog."""
     result = diff_against(context.config, previous)
+
+    if as_json:
+        click.echo(diff_to_json(result), nl=False)
+        return
 
     for message in result.added:
         context.say(f"  new      {message.source_text!r}")

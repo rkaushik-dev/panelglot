@@ -28,7 +28,13 @@ from ..rules.registry import build_rules
 from ..rules.result import Finding, Report
 from ..waivers import WaiverOutcome, apply_waivers, load_waivers
 
-__all__ = ["CheckResult", "LocaleCheck", "check_project", "context_for_locale"]
+__all__ = [
+    "CheckResult",
+    "LocaleCheck",
+    "check_project",
+    "context_for_locale",
+    "changed_keys",
+]
 
 #: Panel assumed when a locale entry does not name one.
 DEFAULT_PANEL = "tij-800x600"
@@ -82,9 +88,32 @@ class CheckResult:
         return list(self.waivers.waived) if self.waivers else []
 
 
+def changed_keys(config: ProjectConfig, previous: Path | str) -> set[str]:
+    """Keys that are new or different since a saved copy of the catalog.
+
+    The set a review wants. A check that reports six hundred findings on a
+    branch that touched four strings blocks nothing, because nobody reads the
+    six hundred to find the four, and after the second time nobody reads the
+    report at all.
+    """
+    from .diff import diff_against
+
+    diff = diff_against(config, previous)
+    return {m.key for m in diff.added} | {c.key for c in diff.changed}
+
+
 def check_project(config: ProjectConfig, *, locales: list[str] | None = None,
-                  use_waivers: bool = True) -> CheckResult:
-    """Check every configured language, or only the ones named."""
+                  use_waivers: bool = True,
+                  only_keys: set[str] | None = None) -> CheckResult:
+    """Check every configured language, or only the ones named.
+
+    ``only_keys`` restricts the per-message rules to part of the catalog. It
+    does not restrict the analyses, and that asymmetry is deliberate: an
+    analysis finding is about a relationship between messages, and a mnemonic
+    collision between a string somebody just changed and one they did not is
+    exactly the regression this mode is for. Filtering it on the key it
+    happens to be anchored to would throw half of those away.
+    """
     catalog = _load_catalog(config)
     glossary = load_glossary(config.root / config.glossary) if config.glossary else None
     rules = build_rules(config.check)
@@ -111,7 +140,8 @@ def check_project(config: ProjectConfig, *, locales: list[str] | None = None,
                 f"{context.font.name}. Fitting findings are approximate."
             )
 
-        _check_locale(catalog, translations, context, rules, result.report, summary)
+        _check_locale(catalog, translations, context, rules, result.report, summary,
+                      only_keys=only_keys)
         _analyse_locale(catalog, translations, context, analyses, result.report)
         result.locales.append(summary)
 
@@ -171,13 +201,20 @@ def context_for_locale(config: ProjectConfig, entry: LocaleEntry,
 
 
 def _check_locale(catalog: Catalog, translations: TranslationSet, context: RuleContext,
-                  rules, report: Report, summary: LocaleCheck) -> None:
+                  rules, report: Report, summary: LocaleCheck, *,
+                  only_keys: set[str] | None = None) -> None:
     for key in catalog.sorted_keys():
         message = catalog.messages[key]
         translation = translations.get(key)
 
         if translation.text:
+            # Counted before the filter. The coverage line says how much of
+            # the language is done, and that number must not change because
+            # somebody asked to see a subset of the findings.
             summary.translated += 1
+
+        if only_keys is not None and key not in only_keys:
+            continue
 
         # Every rule runs, including on messages with no translation. The
         # content rules all return immediately on an empty one, and the state
