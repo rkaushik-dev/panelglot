@@ -19,11 +19,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from ..config import ProjectConfig
 from ..ops.build import BuildResult
+from ..reproducible import build_datetime
 
 __all__ = ["MANIFEST_VERSION", "MANIFEST_NAME", "Manifest", "build_manifest"]
 
@@ -88,7 +89,7 @@ def build_manifest(config: ProjectConfig, result: BuildResult, *,
     manifest is for comparing against what is on an SD card, so it has to
     describe what actually landed, including anything a filesystem did to it.
     """
-    stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    stamp = (now or build_datetime()).replace(microsecond=0)
 
     manifest = Manifest(
         project=config.name,

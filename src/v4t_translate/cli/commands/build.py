@@ -8,7 +8,14 @@ import click
 
 from ... import __version__
 from ...emit.manifest import MANIFEST_NAME, build_manifest
-from ...ops.build import BuildResult, build_project, check_before_build
+from ...errors import CheckFailed
+from ...ops.build import (
+    BuildResult,
+    build_project,
+    check_before_build,
+    unreproducible_outputs,
+)
+from ...reproducible import is_pinned
 from ..context import Context, pass_context
 
 __all__ = ["build"]
@@ -24,12 +31,19 @@ __all__ = ["build"]
               default=None, type=click.Path(dir_okay=False, path_type=Path),
               help="Also write a manifest of what was built. Defaults to "
                    f"{MANIFEST_NAME} in the output directory.")
+@click.option("--reproducible", is_flag=True,
+              help="Build everything twice and fail if the bytes differ. "
+                   "Set SOURCE_DATE_EPOCH first or the stamps will.")
 @pass_context
 def build(context: Context, locales: tuple[str, ...], dry_run: bool,
-          no_check: bool, manifest_path: Path | None) -> None:
+          no_check: bool, manifest_path: Path | None,
+          reproducible: bool) -> None:
     """Produce every configured output."""
     wanted = list(locales) or None
     config = context.config
+
+    if reproducible:
+        _check_reproducible(context, config, wanted)
 
     if not no_check:
         with context.step("check-before-build"):
@@ -53,6 +67,32 @@ def build(context: Context, locales: tuple[str, ...], dry_run: bool,
 
     manifest.write(destination)
     context.say(f"{manifest.summary()} -> {destination}")
+
+
+def _check_reproducible(context: Context, config, wanted: list[str] | None) -> None:
+    """Build twice into memory and complain if the two disagree."""
+    if not is_pinned():
+        context.warn(
+            "SOURCE_DATE_EPOCH is not set, so anything that stamps a date will "
+            "differ between the two builds and this will report it. Set it to "
+            "the commit time."
+        )
+
+    with context.step("reproducible-check") as fields:
+        problems = unreproducible_outputs(config, locales=wanted)
+        fields["differing"] = len(problems)
+
+    if not problems:
+        context.say("built twice, byte for byte the same")
+        return
+
+    for name in problems:
+        context.warn(f"{name} differs between two builds of the same input")
+
+    raise CheckFailed(
+        f"{len(problems)} outputs are not reproducible",
+        error_count=len(problems),
+    )
 
 
 def report(context: Context, result: BuildResult, *, dry_run: bool) -> None:

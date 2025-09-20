@@ -33,6 +33,7 @@ __all__ = [
     "resolve_output_path",
     "destination_for",
     "is_inside",
+    "unreproducible_outputs",
 ]
 
 
@@ -189,6 +190,46 @@ def _load_catalog(config: ProjectConfig) -> Catalog:
     if not path.exists():
         raise CatalogError(f"{path} does not exist. Run extract before build.")
     return load_catalog(path)
+
+
+def unreproducible_outputs(config: ProjectConfig, *,
+                           locales: list[str] | None = None) -> list[str]:
+    """Outputs that come out differently when built twice in a row.
+
+    Builds everything into memory twice and compares the bytes. It costs a
+    second build and it is the only check that actually answers the question,
+    because an emitter that is right about determinism today is one library
+    upgrade away from a dict that iterates in a different order.
+
+    Returns the ones that disagree, named for a report. An empty list is the
+    answer everybody wants.
+    """
+    first = _staged(config, locales)
+    second = _staged(config, locales)
+
+    problems: list[str] = []
+    for name, data in first.items():
+        if second.get(name) != data:
+            problems.append(name)
+
+    problems.extend(name for name in second if name not in first)
+    return sorted(problems)
+
+
+def _staged(config: ProjectConfig, locales: list[str] | None) -> dict[str, bytes]:
+    """Everything a build would write, keyed by what it would be called."""
+    catalog = _load_catalog(config)
+    produced: dict[str, bytes] = {}
+
+    for entry in _select(config, locales):
+        translations = load_translations(config.translations_path(entry.tag))
+        for output in config.outputs:
+            if not output.applies_to(entry.tag):
+                continue
+            _, path, data = _produce(config, catalog, translations, entry, output)
+            produced[f"{entry.tag} {output.kind} {path.name}"] = data
+
+    return produced
 
 
 def check_before_build(config: ProjectConfig, *, locales: list[str] | None = None) -> None:

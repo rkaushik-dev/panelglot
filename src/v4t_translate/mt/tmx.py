@@ -29,6 +29,7 @@ from xml.sax.saxutils import escape
 
 from ..errors import SourceError
 from ..locales import Locale, lookup
+from ..reproducible import build_date
 from .memory import TranslationMemory
 
 __all__ = ["TmxRead", "read_tmx", "write_tmx", "INLINE_TAGS"]
@@ -165,7 +166,7 @@ def write_tmx(path: Path | str, memory: TranslationMemory, target: str, *,
     if wanted is None:
         raise SourceError(f"{target} is not a language this build knows")
 
-    stamp = (today or date.today()).strftime("%Y%m%dT000000Z")
+    stamp = (today or build_date()).strftime("%Y%m%dT000000Z")
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
         '<tmx version="1.4">',
