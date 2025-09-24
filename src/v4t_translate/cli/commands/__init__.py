@@ -17,7 +17,7 @@ from .font import font
 from .init import init
 from .inspect import diff, doctor, prune, stats, verify
 from .status import status
-from .sync import export, import_
+from .sync import adopt, export, import_
 from .translate import memory, pretranslate
 
 __all__ = ["COMMANDS", "register"]
@@ -27,6 +27,7 @@ COMMANDS: tuple[click.Command, ...] = (
     init,
     status,
     extract,
+    adopt,
     check,
     export,
     import_,

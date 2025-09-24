@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from ...errors import CheckFailed
+from ...ops.adopt import adopt_locale
 from ...ops.sync import (
     ImportResult,
     export_workbooks,
@@ -15,7 +16,7 @@ from ...ops.sync import (
 )
 from ..context import Context, pass_context
 
-__all__ = ["export", "import_", "XLIFF_SUFFIXES"]
+__all__ = ["export", "import_", "adopt", "XLIFF_SUFFIXES"]
 
 
 @click.command()
@@ -89,6 +90,46 @@ def import_(context: Context, delivery: Path, locale: str | None, sheet: str | N
             f"{len(result.ambiguous)} were ambiguous",
             error_count=len(result.unmatched) + len(result.ambiguous),
         )
+
+
+@click.command()
+@click.argument("locale")
+@click.argument("localised",
+                type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--kind", default="rc", show_default=True,
+              help="What kind of source the translated copy is.")
+@click.option("--encoding", help="Override the encoding of the translated copy.")
+@click.option("--overwrite", is_flag=True,
+              help="Replace translations the catalog already has. The catalog "
+                   "is usually the better copy, so this is off by default.")
+@click.option("--dry-run", is_flag=True, help="Report what would change, write nothing.")
+@pass_context
+def adopt(context: Context, locale: str, localised: Path, kind: str,
+          encoding: str | None, overwrite: bool, dry_run: bool) -> None:
+    """Lift one language's answers out of an already translated source file."""
+    result = adopt_locale(context.config, locale, localised, kind=kind,
+                          encoding=encoding, overwrite=overwrite, dry_run=dry_run)
+
+    for warning in result.warnings:
+        context.warn(warning)
+
+    context.say(result.summary())
+
+    for position in result.orphans:
+        context.say(f"  only in {localised.name}: {position}", level=1)
+    for position in result.missing:
+        context.say(f"  only in the English: {position}", level=1)
+
+    context.say(
+        "Everything adopted lands as needs-review. It was written against an "
+        "English that may have moved, so nothing here is known to be current.",
+        level=1,
+    )
+
+    if dry_run:
+        context.say("dry run, nothing written")
+    elif result.written is not None:
+        context.say(f"wrote {result.written}", level=1)
 
 
 def report(context: Context, result: ImportResult, *, dry_run: bool) -> None:

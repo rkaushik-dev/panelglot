@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 #: Must match the "for command in ..." line in the selfcheck job.
 CI_COMMANDS = [
-    "init", "status", "extract", "check", "export", "import", "build",
+    "init", "status", "extract", "adopt", "check", "export", "import", "build",
     "pretranslate", "stats", "doctor", "memory", "diff", "font", "verify",
     "prune",
 ]
