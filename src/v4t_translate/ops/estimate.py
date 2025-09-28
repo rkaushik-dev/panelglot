@@ -28,11 +28,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..catalog.store import Catalog, load_catalog, load_translations
+from ..catalog.store import Catalog, load_translations
 from ..config import ProjectConfig
-from ..errors import CatalogError
 from ..mt.base import protect_placeholders
 from ..mt.memory import TranslationMemory
+from .project import require_catalog
 
 __all__ = ["LocaleEstimate", "ProjectEstimate", "estimate_project", "billable_length"]
 
@@ -127,7 +127,7 @@ def estimate_project(config: ProjectConfig, *, locales: list[str] | None = None,
                      memory: TranslationMemory | None = None,
                      batch_size: int = 50) -> ProjectEstimate:
     """Count what a pretranslate run would post, without posting anything."""
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     estimate = ProjectEstimate(project=config.name, batch_size=batch_size)
 
     owned = memory is None
@@ -174,10 +174,3 @@ def _for_locale(catalog: Catalog, config: ProjectConfig, tag: str, locale,
         found.billable_characters += billable_length(message.source_text)
 
     return found
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(f"{path} does not exist. Run extract first.")
-    return load_catalog(path)

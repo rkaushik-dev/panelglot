@@ -26,10 +26,11 @@ from ..catalog.store import Catalog, load_catalog, load_translations, save_trans
 from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
 from ..emit.xliff import read_xliff
-from ..errors import CatalogError, WorkbookError
+from ..errors import WorkbookError
 from ..locales import Locale
 from ..workbook.reader import WorkbookRead, WorkbookRow, read_workbook
 from ..workbook.writer import write_workbook
+from .project import require_catalog
 
 __all__ = [
     "ExportResult",
@@ -134,7 +135,7 @@ def export_workbooks(
     key, so importing both halves in either order lands them in the same
     place.
     """
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     previous = load_catalog(since) if since is not None else None
     result = ExportResult()
 
@@ -186,7 +187,7 @@ def import_workbook(
     default: somebody was paid to produce that column and treating it as a
     draft means it never ships.
     """
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     read = read_workbook(path, sheet=sheet)
     target = _resolve_locale(config, read, locale)
 
@@ -239,7 +240,7 @@ def import_xliff_file(
     ``approve`` is what decides, exactly as it does for a legacy spreadsheet
     with no status column.
     """
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     delivered = read_xliff(Path(path).read_text(encoding="utf-8"), path=str(path))
 
     tag = locale or delivered.locale
@@ -375,10 +376,3 @@ def _resolve_locale(config: ProjectConfig, read: WorkbookRead,
             f"{read.locale.tag}, but {wanted.tag} was asked for"
         )
     return wanted
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(f"{path} does not exist. Run extract first.")
-    return load_catalog(path)

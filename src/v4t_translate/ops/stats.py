@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..catalog.store import Catalog, load_catalog, load_translations
+from ..catalog.store import Catalog, load_translations
 from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
-from ..errors import CatalogError
+from .project import require_catalog
 
 __all__ = ["LocaleStats", "ProjectStats", "project_stats", "count_words"]
 
@@ -121,7 +121,7 @@ class ProjectStats:
 def project_stats(config: ProjectConfig, *,
                   locales: list[str] | None = None) -> ProjectStats:
     """Count everything worth counting."""
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
 
     stats = ProjectStats(project=config.name, messages=len(catalog))
     stats.source_words = sum(
@@ -162,10 +162,3 @@ def _for_locale(tag: str, catalog: Catalog, translations: TranslationSet) -> Loc
             stats.stale += 1
 
     return stats
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(f"{path} does not exist. Run extract first.")
-    return load_catalog(path)

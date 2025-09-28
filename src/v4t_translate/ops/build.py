@@ -19,13 +19,14 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..catalog.store import Catalog, load_catalog, load_translations
+from ..catalog.store import Catalog, load_translations
 from ..config import LocaleEntry, OutputEntry, ProjectConfig
 from ..emit.androidxml import qualifier_for
 from ..emit.base import EmitOptions, EmitResult
 from ..emit.registry import get_emitter
-from ..errors import CatalogError, EmitError
+from ..errors import EmitError
 from ..locales import Locale
+from .project import require_catalog, selected_locales
 
 __all__ = [
     "BuildResult",
@@ -113,7 +114,7 @@ def destination_for(config: ProjectConfig, output: OutputEntry,
 def build_project(config: ProjectConfig, *, locales: list[str] | None = None,
                   dry_run: bool = False) -> BuildResult:
     """Produce every configured output for every requested language."""
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     result = BuildResult()
 
     if not config.outputs:
@@ -122,7 +123,7 @@ def build_project(config: ProjectConfig, *, locales: list[str] | None = None,
         )
         return result
 
-    wanted = _select(config, locales)
+    wanted = selected_locales(config, locales)
     staged: list[tuple[Path, bytes]] = []
 
     for entry in wanted:
@@ -179,17 +180,6 @@ def _produce(config: ProjectConfig, catalog: Catalog, translations, entry: Local
     return emitted, destination, data
 
 
-def _select(config: ProjectConfig, locales: list[str] | None) -> list[LocaleEntry]:
-    if not locales:
-        return list(config.locales)
-    return [config.locale_entry(tag) for tag in locales]
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(f"{path} does not exist. Run extract before build.")
-    return load_catalog(path)
 
 
 def unreproducible_outputs(config: ProjectConfig, *,
@@ -218,10 +208,10 @@ def unreproducible_outputs(config: ProjectConfig, *,
 
 def _staged(config: ProjectConfig, locales: list[str] | None) -> dict[str, bytes]:
     """Everything a build would write, keyed by what it would be called."""
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     produced: dict[str, bytes] = {}
 
-    for entry in _select(config, locales):
+    for entry in selected_locales(config, locales):
         translations = load_translations(config.translations_path(entry.tag))
         for output in config.outputs:
             if not output.applies_to(entry.tag):

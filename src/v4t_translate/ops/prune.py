@@ -20,12 +20,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..catalog.store import Catalog, load_catalog, load_translations, save_translations
+from ..catalog.store import Catalog, load_translations, save_translations
 from ..config import ProjectConfig
-from ..errors import CatalogError
 from ..mt.memory import TranslationMemory
 from .extract import cache_path
 from .memory import memory_path
+from .project import require_catalog
 
 __all__ = ["PruneResult", "prune_project"]
 
@@ -68,7 +68,7 @@ def prune_project(config: ProjectConfig, *, drop_memory: bool = False,
     catalog any more. Off by default: a memory unit can be the only surviving
     copy of an answer from a workbook nobody kept.
     """
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     result = PruneResult()
 
     _prune_translations(config, catalog, result, dry_run=dry_run)
@@ -144,10 +144,3 @@ def _prune_cache(config: ProjectConfig, result: PruneResult, *,
 
     result.freed_bytes += path.stat().st_size
     path.unlink()
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(f"{path} does not exist. Run extract first.")
-    return load_catalog(path)

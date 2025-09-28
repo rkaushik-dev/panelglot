@@ -32,12 +32,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..catalog.store import Catalog, load_catalog, load_translations, save_translations
+from ..catalog.store import Catalog, load_translations, save_translations
 from ..catalog.translations import TranslationState
 from ..config import ProjectConfig
-from ..errors import CatalogError, SourceError
+from ..errors import SourceError
 from ..sources.base import SourceOptions
 from ..sources.registry import get_source
+from .project import require_catalog
 
 __all__ = ["AdoptResult", "adopt_locale", "adopt_translations", "alignment_key"]
 
@@ -100,7 +101,11 @@ def adopt_locale(config: ProjectConfig, tag: str, localised: Path | str, *,
     through it since.
     """
     entry = config.locale_entry(tag)
-    catalog = _load_catalog(config)
+    catalog = require_catalog(
+        config,
+        because="Adopting lines a translated copy up against a catalog, and "
+                "there is no catalog yet.",
+    )
     translations = load_translations(config.translations_path(entry.tag))
 
     result = AdoptResult(locale=entry.tag, path=str(localised))
@@ -197,16 +202,6 @@ def _describe(position: AlignmentKey) -> str:
     where = f"{container}/{symbol}" if symbol and symbol != container else container
     return f"{kind} {where}#{ordinal}"
 
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(
-            f"{path} does not exist. Extract the English first: adopting is "
-            f"lining a translated copy up against a catalog, and there is no "
-            f"catalog yet."
-        )
-    return load_catalog(path)
 
 
 def adopt_translations(config: ProjectConfig,

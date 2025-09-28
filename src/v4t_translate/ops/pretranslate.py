@@ -25,14 +25,15 @@ import dataclasses
 from dataclasses import dataclass, field
 from datetime import date
 
-from ..catalog.store import Catalog, load_catalog, load_translations, save_translations
+from ..catalog.store import Catalog, load_translations, save_translations
 from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
-from ..errors import CatalogError, ConfigError
+from ..errors import ConfigError
 from ..locales import Locale
 from ..mt.base import Provider
 from ..mt.memory import DEFAULT_THRESHOLD, TranslationMemory
 from ..mt.providers import get_provider
+from .project import require_catalog
 
 __all__ = [
     "PretranslateResult",
@@ -90,7 +91,7 @@ def pretranslate_project(
     today: date | None = None,
 ) -> PretranslateResult:
     """Fill in one language from memory and, optionally, a provider."""
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     entry = config.locale_entry(locale)
     translations = load_translations(config.translations_path(entry.tag))
 
@@ -245,10 +246,3 @@ def _resolve_provider(config: ProjectConfig,
 def _batched(items: list[str], size: int):
     for start in range(0, len(items), size):
         yield items[start : start + size]
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(f"{path} does not exist. Run extract first.")
-    return load_catalog(path)

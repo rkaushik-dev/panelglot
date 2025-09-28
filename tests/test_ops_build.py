@@ -152,7 +152,7 @@ def test_build_before_extract(tmp_path, sample_rc_path):
     shutil.copy(sample_rc_path, tmp_path / "src" / "V4T.rc")
     (tmp_path / "v4t-translate.toml").write_text(CONFIG, encoding="utf-8")
     config = load_config(tmp_path / "v4t-translate.toml")
-    with pytest.raises(CatalogError, match="Run extract before build"):
+    with pytest.raises(CatalogError, match="Run extract first"):
         build_project(config)
 
 

@@ -16,10 +16,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..analyses.registry import build_analyses
-from ..catalog.store import Catalog, load_catalog, load_translations
+from ..catalog.store import Catalog, load_translations
 from ..catalog.translations import TranslationSet
 from ..config import LocaleEntry, ProjectConfig
-from ..errors import CatalogError
 from ..glossary import Term, load_glossary
 from ..layout.font import FontMetrics
 from ..layout.panels import Panel, font_for, get_panel
@@ -27,6 +26,7 @@ from ..rules.base import RuleContext
 from ..rules.registry import build_rules
 from ..rules.result import Finding, Report
 from ..waivers import WaiverOutcome, apply_waivers, load_waivers
+from .project import font_search_path, require_catalog, selected_locales
 
 __all__ = [
     "CheckResult",
@@ -114,12 +114,12 @@ def check_project(config: ProjectConfig, *, locales: list[str] | None = None,
     exactly the regression this mode is for. Filtering it on the key it
     happens to be anchored to would throw half of those away.
     """
-    catalog = _load_catalog(config)
+    catalog = require_catalog(config)
     glossary = load_glossary(config.root / config.glossary) if config.glossary else None
     rules = build_rules(config.check)
     analyses = build_analyses(config.check)
 
-    wanted = _select(config, locales)
+    wanted = selected_locales(config, locales)
     result = CheckResult(report=Report(), catalog=catalog)
 
     for entry in wanted:
@@ -183,7 +183,7 @@ def context_for_locale(config: ProjectConfig, entry: LocaleEntry,
     if explicit is not None and not explicit.exists():
         explicit = None
 
-    font = font_for(panel, search=_font_search_path(config), explicit=explicit)
+    font = font_for(panel, search=font_search_path(config), explicit=explicit)
     is_fallback = font.name.endswith("-fallback")
 
     terms: dict[str, Term] = {}
@@ -234,22 +234,3 @@ def _analyse_locale(catalog: Catalog, translations: TranslationSet,
     """
     for analysis in analyses:
         report.extend(list(analysis.run(catalog, translations, context)))
-
-
-def _select(config: ProjectConfig, locales: list[str] | None) -> list[LocaleEntry]:
-    if not locales:
-        return list(config.locales)
-    return [config.locale_entry(tag) for tag in locales]
-
-
-def _font_search_path(config: ProjectConfig) -> list[Path]:
-    return [config.root / "fonts", config.root]
-
-
-def _load_catalog(config: ProjectConfig) -> Catalog:
-    path = config.catalog_path()
-    if not path.exists():
-        raise CatalogError(
-            f"{path} does not exist. Run extract before check."
-        )
-    return load_catalog(path)
