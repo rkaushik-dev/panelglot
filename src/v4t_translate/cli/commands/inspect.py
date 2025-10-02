@@ -11,10 +11,10 @@ from ...ops.diff import diff_against, diff_to_json, outstanding_after
 from ...ops.doctor import run_doctor
 from ...ops.prune import prune_project
 from ...ops.stats import project_stats
-from ...ops.verify import verify_pack
+from ...ops.verify import compare_packs, verify_pack
 from ..context import Context, pass_context
 
-__all__ = ["stats", "diff", "doctor", "verify", "prune"]
+__all__ = ["stats", "diff", "doctor", "verify", "prune", "pack_diff"]
 
 
 @click.command()
@@ -122,6 +122,36 @@ def verify(context: Context, pack: tuple[Path, ...], header: Path | None,
         raise CheckFailed(
             f"{refused} of {len(pack)} packs would be refused", error_count=refused
         )
+
+
+@click.command("pack-diff")
+@click.argument("before",
+                type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("after",
+                type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--limit", type=int, default=20, show_default=True,
+              help="Differences shown before the rest are counted. 0 for all.")
+@pass_context
+def pack_diff(context: Context, before: Path, after: Path, limit: int) -> None:
+    """Say which strings differ between two built .v4l packs."""
+    comparison = compare_packs(before, after)
+
+    for problem in comparison.problems:
+        context.warn(problem)
+
+    shown = (comparison.differences if limit <= 0
+             else comparison.differences[:limit])
+    for difference in shown:
+        context.say(f"  {difference.describe()}")
+
+    hidden = len(comparison.differences) - len(shown)
+    if hidden > 0:
+        context.say(f"  ... and {hidden} more, use --limit 0 to see them all")
+
+    context.say(comparison.summary())
+
+    if comparison.problems:
+        raise CheckFailed("the two packs are not comparable", error_count=1)
 
 
 @click.command()

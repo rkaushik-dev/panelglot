@@ -15,7 +15,7 @@ from .check import check
 from .extract import extract
 from .font import font
 from .init import init
-from .inspect import diff, doctor, prune, stats, verify
+from .inspect import diff, doctor, pack_diff, prune, stats, verify
 from .status import status
 from .sync import adopt, export, import_
 from .translate import memory, pretranslate
@@ -34,6 +34,7 @@ COMMANDS: tuple[click.Command, ...] = (
     pretranslate,
     build,
     verify,
+    pack_diff,
     stats,
     diff,
     doctor,

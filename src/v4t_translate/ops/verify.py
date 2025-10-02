@@ -28,7 +28,124 @@ from ..errors import EmitError
 from ..locales import lookup
 from ..sources.cheader import parse_enum
 
-__all__ = ["VerifyResult", "verify_pack", "signature_of_header"]
+__all__ = [
+    "VerifyResult",
+    "PackDifference",
+    "PackComparison",
+    "verify_pack",
+    "signature_of_header",
+    "compare_packs",
+]
+
+
+@dataclass(frozen=True)
+class PackDifference:
+    """One slot that does not say the same thing in both packs."""
+
+    index: int
+    before: str
+    after: str
+
+    @property
+    def kind(self) -> str:
+        if not self.before:
+            return "filled in"
+        if not self.after:
+            return "emptied"
+        return "changed"
+
+    def describe(self) -> str:
+        if self.kind == "filled in":
+            return f"slot {self.index} was empty and is now {self.after!r}"
+        if self.kind == "emptied":
+            return f"slot {self.index} was {self.before!r} and is now empty"
+        return f"slot {self.index}: {self.before!r} -> {self.after!r}"
+
+
+@dataclass
+class PackComparison:
+    """What changed between two builds of the same language."""
+
+    before: Path
+    after: Path
+    differences: list[PackDifference] = field(default_factory=list)
+    problems: list[str] = field(default_factory=list)
+    """Reasons the two are not comparable slot by slot at all."""
+
+    @property
+    def identical(self) -> bool:
+        return not self.differences and not self.problems
+
+    def by_kind(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for difference in self.differences:
+            counts[difference.kind] = counts.get(difference.kind, 0) + 1
+        return counts
+
+    def summary(self) -> str:
+        if self.problems:
+            return f"{self.before.name} and {self.after.name}: {self.problems[0]}"
+        if not self.differences:
+            return f"{self.before.name} and {self.after.name} are the same pack"
+        parts = ", ".join(f"{count} {kind}"
+                          for kind, count in sorted(self.by_kind().items()))
+        return f"{len(self.differences)} slots differ ({parts})"
+
+
+def compare_packs(before: Path | str, after: Path | str) -> PackComparison:
+    """Say what moved between two packs, slot by slot.
+
+    This is the two in the morning question. There is a pack on the card and a
+    pack in the archive, the panel is showing something nobody expects, and
+    what everybody wants to know is which strings are not the same.
+
+    Comparison is by slot index, not by text, because the slot is what the
+    firmware indexes with. Two packs with different signatures are not
+    comparable at all and it says so instead of producing a diff of nonsense:
+    the enum moved between them, so slot 40 is a different string in each.
+    """
+    before, after = Path(before), Path(after)
+    first = read_pack(_read(before))
+    second = read_pack(_read(after))
+
+    comparison = PackComparison(before=before, after=after)
+
+    if first.signature != second.signature:
+        comparison.problems.append(
+            f"the signatures differ ({first.signature:08X} and "
+            f"{second.signature:08X}), so the enum moved between these two "
+            f"builds and the slots do not line up"
+        )
+        return comparison
+
+    if first.tag != second.tag:
+        comparison.problems.append(
+            f"one is {first.tag} and the other is {second.tag}"
+        )
+        return comparison
+
+    if len(first) != len(second):
+        comparison.problems.append(
+            f"one holds {len(first)} strings and the other {len(second)}, "
+            f"with the same signature, which should not be possible"
+        )
+        return comparison
+
+    for index, (old, new) in enumerate(zip(first.strings, second.strings,
+                                           strict=True)):
+        if old != new:
+            comparison.differences.append(
+                PackDifference(index=index, before=old, after=new)
+            )
+
+    return comparison
+
+
+def _read(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError as exc:
+        raise EmitError(f"{path} does not exist") from exc
 
 
 @dataclass
@@ -85,12 +202,7 @@ def verify_pack(pack_path: Path | str, *, header: Path | str | None = None,
                 expect_locale: str | None = None) -> VerifyResult:
     """Read a pack and say whether the firmware would load it."""
     pack_path = Path(pack_path)
-    try:
-        data = pack_path.read_bytes()
-    except FileNotFoundError as exc:
-        raise EmitError(f"{pack_path} does not exist") from exc
-
-    result = VerifyResult(path=pack_path, pack=read_pack(data))
+    result = VerifyResult(path=pack_path, pack=read_pack(_read(pack_path)))
 
     if header is not None:
         expected = signature_of_header(header)
