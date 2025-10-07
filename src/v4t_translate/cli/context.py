@@ -7,12 +7,14 @@ what happened when the config was loaded in the group callback.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
 
 from ..config import ProjectConfig, load_config
 from ..diagnostics import Diagnostics
+from ..locking import project_lock
 
 __all__ = ["Context", "pass_context"]
 
@@ -43,6 +45,19 @@ class Context:
     def step(self, name: str, **fields: object):
         """Time a block and record it. Sugar for the diagnostics call."""
         return self.diagnostics.step(name, **fields)
+
+    @contextmanager
+    def writing(self, operation: str, *, enabled: bool = True):
+        """Hold the project lock for a write, and report a stolen one.
+
+        Every operation that reads the catalog, changes it and writes it back
+        goes through here. Two of those running at once on a share is how a
+        delivery disappears without anything erroring.
+        """
+        with project_lock(self.config, operation, enabled=enabled) as lock:
+            yield lock
+            for warning in lock.warnings if lock else []:
+                self.warn(warning)
 
     def finish(self) -> None:
         """Close the log, and print the timings if they were asked for."""

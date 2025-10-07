@@ -69,18 +69,19 @@ XLIFF_SUFFIXES = (".xlf", ".xliff")
 def import_(context: Context, delivery: Path, locale: str | None, sheet: str | None,
             dry_run: bool, draft: bool, strict: bool) -> None:
     """Read a delivered workbook or XLIFF file back into the catalog."""
-    if delivery.suffix.lower() in XLIFF_SUFFIXES:
-        if sheet is not None:
-            context.warn("--sheet means nothing for an XLIFF delivery, ignored")
-        result = import_xliff_file(
-            context.config, delivery, locale=locale,
-            dry_run=dry_run, approve=not draft,
-        )
-    else:
-        result = import_workbook(
-            context.config, delivery, locale=locale, sheet=sheet,
-            dry_run=dry_run, approve=not draft,
-        )
+    with context.writing("import", enabled=not dry_run):
+        if delivery.suffix.lower() in XLIFF_SUFFIXES:
+            if sheet is not None:
+                context.warn("--sheet means nothing for an XLIFF delivery, ignored")
+            result = import_xliff_file(
+                context.config, delivery, locale=locale,
+                dry_run=dry_run, approve=not draft,
+            )
+        else:
+            result = import_workbook(
+                context.config, delivery, locale=locale, sheet=sheet,
+                dry_run=dry_run, approve=not draft,
+            )
 
     report(context, result, dry_run=dry_run)
 
@@ -107,8 +108,10 @@ def import_(context: Context, delivery: Path, locale: str | None, sheet: str | N
 def adopt(context: Context, locale: str, localised: Path, kind: str,
           encoding: str | None, overwrite: bool, dry_run: bool) -> None:
     """Lift one language's answers out of an already translated source file."""
-    result = adopt_locale(context.config, locale, localised, kind=kind,
-                          encoding=encoding, overwrite=overwrite, dry_run=dry_run)
+    with context.writing("adopt", enabled=not dry_run):
+        result = adopt_locale(context.config, locale, localised, kind=kind,
+                              encoding=encoding, overwrite=overwrite,
+                              dry_run=dry_run)
 
     for warning in result.warnings:
         context.warn(warning)

@@ -52,10 +52,11 @@ def pretranslate(context: Context, locale: str | None, provider: str | None,
         raise click.UsageError("which language? pretranslate takes one, "
                                "or use --estimate for all of them")
 
-    result = pretranslate_project(
-        context.config, locale, provider=provider, trust_memory=trust_memory,
-        threshold=threshold, dry_run=dry_run,
-    )
+    with context.writing("pretranslate", enabled=not dry_run):
+        result = pretranslate_project(
+            context.config, locale, provider=provider, trust_memory=trust_memory,
+            threshold=threshold, dry_run=dry_run,
+        )
 
     for warning in result.warnings:
         context.warn(warning)
