@@ -333,9 +333,13 @@ class _Parser:
     def parse_dialog(self, name: str, statement: Token) -> Dialog:
         dialog = Dialog(symbol=name, statement=statement.text.upper(), line=statement.line)
 
-        geometry = self.read_line_numbers(statement.line)
+        header = self.read_statement_arguments(statement.line)
+        geometry = [t.value for t in header
+                    if t.kind is TokenKind.NUMBER and isinstance(t.value, int)]
         for attribute, value in zip(("x", "y", "width", "height"), geometry, strict=False):
             setattr(dialog, attribute, value)
+
+        dialog.header_end = header[-1].end if header else statement.end
 
         while (self.current.kind is TokenKind.IDENT
                and self.current.text.upper() in _DIALOG_ATTRIBUTES):
@@ -367,6 +371,10 @@ class _Parser:
             self.apply_font(dialog, arguments)
         elif upper == "STYLE":
             dialog.styles = [t.text for t in arguments if t.kind is TokenKind.IDENT]
+        elif upper == "EXSTYLE":
+            dialog.exstyles = [t.text for t in arguments if t.kind is TokenKind.IDENT]
+            end = arguments[-1].end if arguments else keyword.end
+            dialog.exstyle_span = (keyword.start, end)
 
     @staticmethod
     def apply_font(dialog: Dialog, arguments: list[Token]) -> None:

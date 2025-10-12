@@ -100,6 +100,20 @@ class Dialog:
     styles: list[str] = field(default_factory=list)
     line: int = 0
 
+    exstyles: list[str] = field(default_factory=list)
+    """Extended style tokens, as written. Empty when there is no EXSTYLE line."""
+
+    exstyle_span: tuple[int, int] | None = None
+    """Offsets of the whole EXSTYLE line, so a locale can rewrite it."""
+
+    header_end: int = 0
+    """Offset just past the header line, where an EXSTYLE would be inserted.
+
+    Kept because a dialog with no EXSTYLE has no span to replace, and a right
+    to left build has to put one somewhere. Immediately after the header is
+    where the dialog editor puts it.
+    """
+
     def captioned_controls(self) -> Iterator[Control]:
         """Controls that carry text a translator will see."""
         for control in self.controls:

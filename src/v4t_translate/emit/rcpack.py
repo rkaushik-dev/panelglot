@@ -28,6 +28,7 @@ from ..catalog.store import Catalog
 from ..catalog.translations import TranslationSet
 from ..errors import EmitError
 from ..layout.dlu import resolve_shell_font
+from ..layout.mirror import mirrored_exstyles, render_exstyle
 from ..sources.rc.ast import ResourceScript
 from ..sources.rc.lexer import quote_rc_string
 from ..sources.rc.parser import parse_resource_script
@@ -159,6 +160,9 @@ class RcEmitter:
                              options.locale.language_statement)
             )
 
+        if options.locale.rtl:
+            self._mirror(script, out)
+
         for dialog in script.dialogs:
             if not dialog.font_span:
                 continue
@@ -170,6 +174,29 @@ class RcEmitter:
                 _Replacement(dialog.font_span[0], dialog.font_span[1],
                              quote_rc_string(target_font))
             )
+
+    @staticmethod
+    def _mirror(script: ResourceScript, out: list[_Replacement]) -> None:
+        """Turn every dialog round for a right to left language.
+
+        Two extended styles rather than mirrored coordinates. Coordinates in
+        the file would have to be recomputed every time somebody drags a
+        control in the English dialog, and the day that is forgotten the two
+        drift apart quietly. These two words stay correct.
+
+        A dialog with an EXSTYLE already has its line rewritten, keeping what
+        was there. A dialog with none gets one inserted just after its header,
+        which is where the dialog editor puts it.
+        """
+        for dialog in script.dialogs:
+            line = render_exstyle(mirrored_exstyles(dialog.exstyles))
+
+            if dialog.exstyle_span is not None:
+                out.append(_Replacement(dialog.exstyle_span[0],
+                                        dialog.exstyle_span[1], line))
+            elif dialog.header_end:
+                out.append(_Replacement(dialog.header_end, dialog.header_end,
+                                        "\n" + line))
 
     # -- files ----------------------------------------------------------
 
