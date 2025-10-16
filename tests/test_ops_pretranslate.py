@@ -154,8 +154,9 @@ def test_before_extract(tmp_path, sample_rc_path):
     shutil.copy(sample_rc_path, tmp_path / "src" / "V4T.rc")
     (tmp_path / "v4t-translate.toml").write_text(CONFIG, encoding="utf-8")
     config = load_config(tmp_path / "v4t-translate.toml")
-    with pytest.raises(CatalogError, match="Run extract first"):
+    with pytest.raises(CatalogError) as caught:
         pretranslate_project(config, "de-DE")
+    assert "Run extract first" in caught.value.remedy
 
 
 def test_a_memory_is_opened_beside_the_catalog_when_none_is_given(project):

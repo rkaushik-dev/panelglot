@@ -107,6 +107,11 @@ def run(argv: list[str] | None = None) -> int:
         if show_traceback:
             raise
         click.echo(click.style("error: ", fg="red") + str(exc), err=True)
+        if exc.remedy:
+            # On its own line because it is an instruction and the line above
+            # is a statement about the past. Run together they read as one
+            # long sentence that ends in a suggestion nobody notices.
+            click.echo(f"  try: {exc.remedy}", err=True)
         return exc.exit_code
     except click.ClickException as exc:
         exc.show()

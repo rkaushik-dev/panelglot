@@ -148,8 +148,9 @@ def test_the_refusal_says_what_to_do(tmp_path):
     path = tmp_path / ".lock"
     path.write_text(somebody_else(time.time()).serialise(), encoding="utf-8")
 
-    with pytest.raises(LockError, match="delete the file"):
+    with pytest.raises(LockError) as caught:
         ProjectLock(path).acquire()
+    assert "Wait for that run" in caught.value.remedy
 
 
 def test_a_stale_lock_is_taken_over(tmp_path):

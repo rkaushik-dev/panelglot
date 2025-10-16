@@ -152,8 +152,9 @@ def test_build_before_extract(tmp_path, sample_rc_path):
     shutil.copy(sample_rc_path, tmp_path / "src" / "V4T.rc")
     (tmp_path / "v4t-translate.toml").write_text(CONFIG, encoding="utf-8")
     config = load_config(tmp_path / "v4t-translate.toml")
-    with pytest.raises(CatalogError, match="Run extract first"):
+    with pytest.raises(CatalogError) as caught:
         build_project(config)
+    assert "Run extract first" in caught.value.remedy
 
 
 def test_nothing_is_written_when_one_output_fails(project):

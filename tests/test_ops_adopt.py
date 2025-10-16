@@ -245,8 +245,9 @@ def test_no_catalog_is_refused(tmp_path, sample_rc_path):
     (tmp_path / "v4t-translate.toml").write_text(CONFIG, encoding="utf-8")
     config = load_config(tmp_path / "v4t-translate.toml")
 
-    with pytest.raises(CatalogError, match="no catalog yet"):
+    with pytest.raises(CatalogError) as caught:
         adopt_locale(config, "de-DE", tmp_path / "src" / "V4T_de.rc")
+    assert "no catalog yet" in caught.value.remedy
 
 
 def test_an_unconfigured_language_is_refused(project):

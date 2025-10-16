@@ -65,20 +65,23 @@ def test_the_refusal_names_the_file(unextracted):
 
 def test_the_refusal_says_what_to_run(unextracted):
     # An operation that refuses because a file is missing has one job beyond
-    # refusing, which is to say what to run instead.
-    with pytest.raises(CatalogError, match="Run extract first"):
+    # refusing, which is to say what to run instead. That goes in the remedy,
+    # not in the message: one is an instruction and the other is not.
+    with pytest.raises(CatalogError) as caught:
         require_catalog(unextracted)
+    assert "Run extract first" in caught.value.remedy
 
 
 def test_a_reason_is_appended(unextracted):
-    with pytest.raises(CatalogError, match="because I said so"):
+    with pytest.raises(CatalogError) as caught:
         require_catalog(unextracted, because="because I said so")
+    assert caught.value.remedy.endswith("because I said so")
 
 
 def test_no_reason_leaves_no_trailing_space(unextracted):
     with pytest.raises(CatalogError) as caught:
         require_catalog(unextracted)
-    assert not str(caught.value).endswith(" ")
+    assert not caught.value.remedy.endswith(" ")
 
 
 # -- the language selection ---------------------------------------------

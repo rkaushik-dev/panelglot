@@ -61,8 +61,9 @@ def test_check_before_extract_says_so(tmp_path, sample_rc_path):
     shutil.copy(sample_rc_path, tmp_path / "src" / "V4T.rc")
     (tmp_path / "v4t-translate.toml").write_text(CONFIG, encoding="utf-8")
     config = load_config(tmp_path / "v4t-translate.toml")
-    with pytest.raises(CatalogError, match="Run extract first"):
+    with pytest.raises(CatalogError) as caught:
         check_project(config)
+    assert "Run extract first" in caught.value.remedy
 
 
 def test_an_untranslated_project_finds_nothing(project):

@@ -38,10 +38,10 @@ def require_catalog(config: ProjectConfig, *, because: str = "") -> Catalog:
     if path.exists():
         return load_catalog(path)
 
-    message = f"{path} does not exist. Run extract first."
+    remedy = "Run extract first."
     if because:
-        message = f"{message} {because}"
-    raise CatalogError(message)
+        remedy = f"{remedy} {because}"
+    raise CatalogError(f"{path} does not exist", remedy=remedy)
 
 
 def selected_locales(config: ProjectConfig,

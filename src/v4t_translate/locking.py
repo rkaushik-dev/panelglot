@@ -35,7 +35,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import V4TError
+from .errors import LockError
 
 __all__ = ["LockError", "LockInfo", "ProjectLock", "STALE_AFTER", "held"]
 
@@ -43,12 +43,6 @@ __all__ = ["LockError", "LockInfo", "ProjectLock", "STALE_AFTER", "held"]
 #: pretranslate against a rate limited engine really does take that long, and
 #: stealing a lock from a process that is still working is the worse failure.
 STALE_AFTER = 20 * 60
-
-
-class LockError(V4TError):
-    """Somebody else is writing."""
-
-    exit_code = 4
 
 
 @dataclass(frozen=True)
@@ -183,8 +177,9 @@ class ProjectLock:
             return
 
         raise LockError(
-            f"{self.path.name} is held by {existing.describe()}. Wait for it, or "
-            f"delete the file if you are certain that run is gone."
+            f"{self.path.name} is held by {existing.describe()}",
+            remedy=f"Wait for that run to finish, or delete {self.path} if you "
+                   f"are certain it is gone.",
         )
 
     def __enter__(self) -> ProjectLock:
