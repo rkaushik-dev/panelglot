@@ -27,6 +27,7 @@ from ..catalog.translations import TranslationSet, TranslationState
 from ..config import ProjectConfig
 from ..emit.xliff import read_xliff
 from ..errors import WorkbookError
+from ..glossary import load_glossary
 from ..locales import Locale
 from ..workbook.reader import WorkbookRead, WorkbookRow, read_workbook
 from ..workbook.writer import write_workbook
@@ -139,6 +140,9 @@ def export_workbooks(
     previous = load_catalog(since) if since is not None else None
     result = ExportResult()
 
+    glossary = (load_glossary(config.root / config.glossary)
+                if config.glossary else None)
+
     buckets = split_by_container(catalog, parts)
 
     for tag in locales or config.target_tags():
@@ -152,6 +156,7 @@ def export_workbooks(
                 only_outstanding=only_outstanding,
                 previous=previous,
                 keys=None if len(buckets) == 1 else keys,
+                glossary=glossary,
             )
             result.written.append((entry.tag, path, rows))
 

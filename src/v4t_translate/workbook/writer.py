@@ -25,7 +25,9 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..catalog.store import Catalog
 from ..catalog.translations import TranslationSet, TranslationState
+from ..glossary import Glossary
 from ..locales import Locale
+from .glossary import write_glossary
 from .instructions import write_instructions
 from .schema import Column
 from .styles import (
@@ -78,6 +80,7 @@ def write_workbook(
     with_instructions: bool = True,
     previous: Catalog | None = None,
     keys: set[str] | None = None,
+    glossary: Glossary | None = None,
 ) -> int:
     """Write the sheet for one language. Returns how many rows it holds.
 
@@ -97,6 +100,10 @@ def write_workbook(
     language gets split across two translators. The sheet is otherwise
     identical, and the key column means the halves merge back on import
     without anybody reconciling anything.
+
+    ``glossary`` adds a sheet of the terms already decided for this language.
+    Reporting a term used wrongly at check time is the last possible moment;
+    by then somebody has translated four hundred strings using the wrong one.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -125,6 +132,9 @@ def write_workbook(
 
     if with_instructions:
         write_instructions(book, locale, catalog.project)
+
+    if glossary is not None:
+        write_glossary(book, glossary, locale.tag)
 
     book.save(path)
     return written
