@@ -9,6 +9,7 @@ import click
 from ...errors import CheckFailed
 from ...ops.diff import diff_against, diff_to_json, outstanding_after
 from ...ops.doctor import run_doctor
+from ...ops.history import history_path, movement_since, record
 from ...ops.prune import prune_project
 from ...ops.stats import project_stats
 from ...ops.verify import compare_packs, verify_pack
@@ -46,10 +47,18 @@ def prune(context: Context, drop_memory: bool, drop_cache: bool,
               help="Only this language. Repeatable.")
 @click.option("--worst-first", is_flag=True,
               help="Order by how far behind each language is.")
+@click.option("--since-last", is_flag=True,
+              help="Also say what has moved since the last recorded run.")
+@click.option("--record", "record_it", is_flag=True,
+              help="Append today's figures to the coverage history.")
 @pass_context
-def stats(context: Context, locales: tuple[str, ...], worst_first: bool) -> None:
+def stats(context: Context, locales: tuple[str, ...], worst_first: bool,
+          since_last: bool, record_it: bool) -> None:
     """Report how far along each language is."""
     result = project_stats(context.config, locales=list(locales) or None)
+
+    if since_last:
+        _say_movement(context, result)
 
     context.say(result.summary())
     if result.protected:
@@ -61,6 +70,25 @@ def stats(context: Context, locales: tuple[str, ...], worst_first: bool) -> None
         for state, count in locale_stats.by_state.items():
             if count:
                 context.say(f"      {state}: {count}", level=1)
+
+    if record_it:
+        # Only when asked. A read-only command that quietly appends to a file
+        # is a read-only command that makes a diff on somebody's branch.
+        written = record(context.config, result)
+        context.say(f"recorded {len(written)} languages in "
+                    f"{history_path(context.config).name}")
+
+
+def _say_movement(context: Context, result) -> None:
+    movements = movement_since(context.config, result)
+    if not movements:
+        context.say("nothing recorded before today, so nothing to compare")
+        context.say("")
+        return
+
+    for movement in movements:
+        context.say(movement.describe())
+    context.say("")
 
 
 @click.command()
