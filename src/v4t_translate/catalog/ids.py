@@ -13,6 +13,17 @@ three of which churn constantly in a Win32 resource script.
 The key is readable on purpose. A reviewer reading a diff of the catalog
 should be able to tell which string moved without decoding a hash, so the
 slug goes in front and the hash only settles collisions.
+
+Everything here is memoised, which is not premature. These functions are pure
+and they are called from the innermost loop of nearly every operation: the rc
+emitter takes a key per string per language, the workbook writer takes one per
+row, and import takes one per row again while it is matching. A profile of a
+build across eleven languages spent a fifth of its time in unicodedata
+normalising the same fourteen hundred strings over and over.
+
+The caches are bounded rather than unbounded because pseudo-localisation
+produces a distinct string per message and an unbounded cache would hold the
+whole catalog twice for no benefit.
 """
 
 from __future__ import annotations
@@ -20,15 +31,19 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from functools import lru_cache
 
 __all__ = [
     "SLUG_LIMIT",
     "HASH_LENGTH",
+    "CACHE_LIMIT",
     "normalize_source",
     "slugify",
     "message_key",
     "source_fingerprint",
     "sort_key",
+    "cache_info",
+    "clear_caches",
 ]
 
 #: Longest slug prefix put in front of the hash.
@@ -38,10 +53,15 @@ SLUG_LIMIT = 32
 #: the ~1400 strings the whole product family carries is comfortable.
 HASH_LENGTH = 6
 
+#: Distinct strings each cache holds. Four thousand covers the whole product
+#: family with room to spare, and caps the memory a pseudo run can take.
+CACHE_LIMIT = 4096
+
 _NON_SLUG = re.compile(r"[^a-z0-9]+")
 _MNEMONIC_RUN = re.compile(r"&&|&")
 
 
+@lru_cache(maxsize=CACHE_LIMIT)
 def normalize_source(text: str) -> str:
     """Put source text in the one form keys and fingerprints are taken over.
 
@@ -53,6 +73,7 @@ def normalize_source(text: str) -> str:
     return unicodedata.normalize("NFC", text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
+@lru_cache(maxsize=CACHE_LIMIT)
 def slugify(text: str) -> str:
     """Turn source text into the readable part of a key.
 
@@ -73,6 +94,7 @@ def slugify(text: str) -> str:
     return slug[:SLUG_LIMIT].rstrip("-")
 
 
+@lru_cache(maxsize=CACHE_LIMIT)
 def message_key(source_text: str, context: str | None = None) -> str:
     """The catalog key for one message.
 
@@ -85,6 +107,7 @@ def message_key(source_text: str, context: str | None = None) -> str:
     return f"{slugify(source_text)}.{digest}"
 
 
+@lru_cache(maxsize=CACHE_LIMIT)
 def source_fingerprint(source_text: str) -> str:
     """Hash of the source text alone, stored beside every translation.
 
@@ -107,3 +130,40 @@ def sort_key(key: str) -> tuple[str, str]:
     if not slug:
         return (key, "")
     return (slug, digest)
+
+
+#: The memoised functions by name, so a caller can look at all four at once.
+#: Named explicitly rather than read off the wrappers: a cached function has
+#: no __name__ that a type checker will believe in.
+_CACHED = {
+    "normalize_source": normalize_source,
+    "slugify": slugify,
+    "message_key": message_key,
+    "source_fingerprint": source_fingerprint,
+}
+
+
+def cache_info() -> dict[str, tuple[int, int]]:
+    """Hits and misses per cache, for the performance tests.
+
+    Exposed rather than left to poking at the decorated functions, because a
+    test that reaches through the decorator breaks the day somebody changes
+    which functions are cached, and that is a change worth noticing rather
+    than a change worth failing on.
+    """
+    return {
+        name: (function.cache_info().hits, function.cache_info().misses)
+        for name, function in _CACHED.items()
+    }
+
+
+def clear_caches() -> None:
+    """Forget everything memoised.
+
+    Nothing in the package needs this: the functions are pure, so a stale
+    entry is impossible. Tests that measure hit counts need a known starting
+    point, and a run that wants its memory back before doing something else
+    large can have it.
+    """
+    for function in _CACHED.values():
+        function.cache_clear()
