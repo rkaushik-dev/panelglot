@@ -10,6 +10,7 @@ from ...errors import CheckFailed
 from ...ops.check import changed_keys, check_project
 from ...report.console import DEFAULT_LIMIT
 from ...report.registry import format_names, get_format, render_check
+from ...rules.catalogue import describe_rule, rule_listing
 from ..context import Context, pass_context
 
 __all__ = ["check"]
@@ -36,11 +37,21 @@ __all__ = ["check"]
 @click.option("--since", type=click.Path(exists=True, dir_okay=False, path_type=Path),
               help="A saved catalog. Only report on messages that are new or "
                    "different since it. For a review.")
+@click.option("--explain", "explain_rule", metavar="RULE",
+              help="Say what one rule is for and stop. Pass 'all' to list them.")
 @pass_context
 def check(context: Context, locales: tuple[str, ...], limit: int, no_detail: bool,
           fail_on: str | None, output_format: str, output: Path | None,
-          colour: bool | None, no_waivers: bool, since: Path | None) -> None:
+          colour: bool | None, no_waivers: bool, since: Path | None,
+          explain_rule: str | None) -> None:
     """Run every rule over the translated catalog."""
+    if explain_rule:
+        # Before the config is touched. Asking what the fitting rule is for is
+        # a reasonable thing to do from a directory with no project in it.
+        click.echo(rule_listing() if explain_rule == "all"
+                   else describe_rule(explain_rule).explain())
+        return
+
     config = context.config
 
     only = None
