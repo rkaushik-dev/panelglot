@@ -253,8 +253,72 @@ def load_config(path: Path | str | None = None) -> ProjectConfig:
     return _build(raw, root=config_path.parent, origin=str(config_path))
 
 
+#: What each table understands. A key not in its set is a typo, and a typo in
+#: a config file is the worst kind of bug in a tool like this: it does not
+#: fail, it does nothing, and it does nothing for a whole round.
+#:
+#: Written out by hand rather than derived from the dataclasses, because the
+#: file spells several of them differently on purpose. An output writes
+#: "fallback" for a field called fallback_to_source, and one of the two names
+#: is for people.
+KNOWN_KEYS: dict[str, frozenset[str]] = {
+    "project": frozenset({
+        "name", "source_locale", "catalog_dir", "workbook_dir", "output_dir",
+        "glossary", "waivers",
+    }),
+    "source": frozenset({
+        "kind", "path", "encoding", "symbols", "defines", "undefines",
+    }),
+    "output": frozenset({
+        "kind", "path", "locale", "locales", "source", "encoding", "fallback",
+        "allow_outside",
+    }),
+    "locale": frozenset({"panel", "font", "codepage"}),
+    "check": frozenset({"fail_on", "disable", "promote", "demote"}),
+    "protected": frozenset({"patterns", "replace_defaults"}),
+}
+
+#: Top-level tables. Anything else at the top of the file is a typo too, and
+#: the same argument applies with more force: a misspelled [[soruce]] leaves a
+#: project with no sources at all.
+KNOWN_TABLES = frozenset({
+    "project", "source", "output", "locale", "check", "protected", "provider",
+})
+
+
+def _suggest(name: str, known: frozenset[str] | set[str]) -> str:
+    """The closest known name, when there is an obvious one.
+
+    Only offered when it is close. A suggestion that is wrong sends somebody
+    off to try it, and being told "did you mean waivers" for a key called
+    encoding is worse than being told nothing.
+    """
+    import difflib
+
+    matches = difflib.get_close_matches(name, sorted(known), n=1, cutoff=0.7)
+    return f" Did you mean {matches[0]!r}?" if matches else ""
+
+
+def _reject_unknown(table: dict[str, Any], known: frozenset[str], *,
+                    where: str, origin: str) -> None:
+    """Refuse a key this table does not understand."""
+    unknown = sorted(set(table) - known)
+    if not unknown:
+        return
+
+    raise ConfigError(
+        f"{origin}: {where} does not understand {', '.join(repr(k) for k in unknown)}",
+        remedy=f"It takes: {', '.join(sorted(known))}."
+               f"{_suggest(unknown[0], known)}",
+    )
+
+
 def _build(raw: dict[str, Any], *, root: Path, origin: str) -> ProjectConfig:
+    _reject_unknown(raw, KNOWN_TABLES, where="the project file", origin=origin)
+
     project = _table(raw, "project", origin)
+    _reject_unknown(project, KNOWN_KEYS["project"], where="[project]",
+                    origin=origin)
     name = project.get("name")
     if not isinstance(name, str) or not name.strip():
         raise ConfigError(f"{origin}: [project] needs a non-empty name")
@@ -285,6 +349,9 @@ def _build(raw: dict[str, Any], *, root: Path, origin: str) -> ProjectConfig:
         config.waivers = Path(str(waivers))
 
     protected = _table(raw, "protected", origin, required=False)
+    _reject_unknown(protected, KNOWN_KEYS["protected"], where="[protected]",
+                    origin=origin)
+
     extra = protected.get("patterns", [])
     if not isinstance(extra, list):
         raise ConfigError(f"{origin}: [protected] patterns must be a list")
@@ -308,6 +375,10 @@ def _sources(raw: dict[str, Any], origin: str) -> list[SourceEntry]:
     for index, entry in enumerate(entries):
         if not isinstance(entry, dict):
             raise ConfigError(f"{origin}: source {index} is not a table")
+
+        _reject_unknown(entry, KNOWN_KEYS["source"],
+                        where=f"source {index}", origin=origin)
+
         kind = entry.get("kind")
         path = entry.get("path")
         if not isinstance(kind, str) or not isinstance(path, str):
@@ -350,6 +421,9 @@ def _outputs(raw: dict[str, Any], origin: str) -> list[OutputEntry]:
     for index, entry in enumerate(entries):
         if not isinstance(entry, dict):
             raise ConfigError(f"{origin}: output {index} is not a table")
+
+        _reject_unknown(entry, KNOWN_KEYS["output"],
+                        where=f"output {index}", origin=origin)
 
         kind = entry.get("kind")
         path = entry.get("path")
@@ -414,6 +488,10 @@ def _locales(raw: dict[str, Any], origin: str) -> list[LocaleEntry]:
     for tag, entry in table.items():
         if not isinstance(entry, dict):
             raise ConfigError(f"{origin}: [locale.{tag}] is not a table")
+
+        _reject_unknown(entry, KNOWN_KEYS["locale"] | {"workbook"},
+                        where=f"[locale.{tag}]", origin=origin)
+
         locale = _resolve_locale(tag, origin)
         workbook = entry.get("workbook")
         font = entry.get("font")
@@ -436,6 +514,8 @@ def _locales(raw: dict[str, Any], origin: str) -> list[LocaleEntry]:
 
 def _check(raw: dict[str, Any], origin: str) -> CheckSettings:
     table = _table(raw, "check", origin, required=False)
+    _reject_unknown(table, KNOWN_KEYS["check"], where="[check]", origin=origin)
+
     fail_on = str(table.get("fail_on", "error"))
     if fail_on not in ("error", "warning", "never"):
         raise ConfigError(
