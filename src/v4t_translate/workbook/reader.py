@@ -17,7 +17,13 @@ downstream notices.
 Rows get sorted, so a legacy sheet cannot be matched by position. Rows get
 duplicated by a careless fill-down, and the two copies disagree.
 
-And the header is not always in row 1, because somebody added a title.
+The header is not always in row 1, because somebody added a title.
+
+And the translation sheet is not always the first one. Our own export puts the
+instructions second and the agreed terms third, but a workbook comes back
+having been through Excel, and Excel remembers which sheet was open when it
+was saved and will happily reorder them if somebody dragged a tab. Taking
+sheet one and failing on it would refuse a delivery that is perfectly good.
 """
 
 from __future__ import annotations
@@ -138,29 +144,68 @@ def read_workbook(path: Path | str, *, sheet: str | None = None) -> WorkbookRead
         raise WorkbookError(f"{path} could not be opened: {exc}") from exc
 
     try:
-        worksheet = _pick_sheet(book, path, sheet)
-        rows = [list(row) for row in worksheet.iter_rows(values_only=True)]
-        title = worksheet.title
+        sheets = _candidate_sheets(book, path, sheet)
+        contents = [(worksheet.title,
+                     [list(row) for row in worksheet.iter_rows(values_only=True)])
+                    for worksheet in sheets]
     finally:
         book.close()
 
-    schema, header_index = _find_header(rows, path=str(path), sheet=title)
+    title, rows, schema, header_index = _choose(contents, path=str(path))
     assert schema.locale is not None  # detect_schema guarantees it
 
     read = WorkbookRead(path=str(path), sheet=title, locale=schema.locale, schema=schema)
+
+    if title != contents[0][0]:
+        read.warnings.append(
+            f"read {title!r}, which is not the first sheet. Somebody reordered "
+            f"the tabs, which is fine."
+        )
+
     _collect(read, rows, header_index, schema)
     _warn_about_duplicates(read)
     return read
 
 
-def _pick_sheet(book, path: Path, wanted: str | None):
+def _candidate_sheets(book, path: Path, wanted: str | None) -> list:
+    """The sheets worth trying, in order.
+
+    A named sheet is the only candidate: being asked for one and reading a
+    different one would be worse than failing.
+    """
     if wanted is None:
-        return book.worksheets[0]
+        return list(book.worksheets)
+
     for worksheet in book.worksheets:
         if worksheet.title == wanted:
-            return worksheet
+            return [worksheet]
+
     names = ", ".join(w.title for w in book.worksheets)
     raise WorkbookError(f"{path} has no sheet named {wanted!r}. It has: {names}")
+
+
+def _choose(contents: list[tuple[str, list[list[object]]]], *, path: str):
+    """The first sheet with a header this can read, and where its header is.
+
+    Falling through to the next sheet rather than failing on the first,
+    because our own export writes three sheets and Excel will reorder them if
+    somebody drags a tab. Refusing a delivery over that would be refusing a
+    delivery that is perfectly good.
+    """
+    first_error: WorkbookError | None = None
+
+    for title, rows in contents:
+        try:
+            schema, header_index = _find_header(rows, path=path, sheet=title)
+        except WorkbookError as exc:
+            if first_error is None:
+                first_error = exc
+            continue
+        return (title, rows, schema, header_index)
+
+    if first_error is not None:
+        raise first_error
+    raise WorkbookError(f"{path} has no sheets in it")
 
 
 def _find_header(rows: list[list[object]], *, path: str,
@@ -193,6 +238,16 @@ def _collect(read: WorkbookRead, rows: list[list[object]], header_index: int,
             status=_cell(raw, schema, Column.STATUS),
             note=_cell(raw, schema, Column.NOTE),
         )
+        if row.target and not row.target.strip():
+            # Leading and trailing spaces are kept on purpose, because some of
+            # these strings are joined at run time. A cell of nothing but
+            # spaces is not that: it is somebody who tabbed through the sheet.
+            read.warnings.append(
+                f"row {offset}: the translation is nothing but whitespace, "
+                f"treated as empty"
+            )
+            row.target = ""
+
         if row.is_empty:
             continue
         if not row.source and not row.key:
