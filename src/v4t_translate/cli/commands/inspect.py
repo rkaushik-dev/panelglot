@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from ...errors import CheckFailed
+from ...ops.audit import audit_against
 from ...ops.diff import diff_against, diff_to_json, outstanding_after
 from ...ops.doctor import run_doctor
 from ...ops.history import history_path, movement_since, record
@@ -15,7 +16,7 @@ from ...ops.stats import project_stats
 from ...ops.verify import compare_packs, verify_pack
 from ..context import Context, pass_context
 
-__all__ = ["stats", "diff", "doctor", "verify", "prune", "pack_diff"]
+__all__ = ["stats", "diff", "doctor", "verify", "prune", "pack_diff", "audit"]
 
 
 @click.command()
@@ -149,6 +150,45 @@ def verify(context: Context, pack: tuple[Path, ...], header: Path | None,
     if refused:
         raise CheckFailed(
             f"{refused} of {len(pack)} packs would be refused", error_count=refused
+        )
+
+
+@click.command()
+@click.argument("manifest",
+                type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--root", type=click.Path(exists=True, file_okay=False,
+                                        path_type=Path),
+              help="The project directory the manifest's paths are relative "
+                   "to. Defaults to the project this config names.")
+@click.option("--extension", "extensions", multiple=True,
+              help="Only these suffixes count as unexpected. Repeatable.")
+@pass_context
+def audit(context: Context, manifest: Path, root: Path | None,
+          extensions: tuple[str, ...]) -> None:
+    """Check a directory of built files against a release manifest."""
+    # The project root rather than the manifest's own directory. A manifest
+    # records project-relative paths and usually sits in the output directory,
+    # so auditing from beside itself reports every file as missing.
+    result = audit_against(manifest, root or context.config.root,
+                           extensions=tuple(e.lower() for e in extensions))
+
+    for verdict in result.problems:
+        context.warn(verdict.describe())
+    for name in result.unexpected:
+        context.warn(f"{name} is not in the manifest")
+
+    for verdict in result.files:
+        if verdict.ok:
+            context.say(f"  {verdict.describe()}", level=1)
+
+    context.say(result.summary())
+
+    if not result.matches:
+        raise CheckFailed(
+            f"{len(result.problems) + len(result.unexpected)} files do not "
+            f"match the manifest",
+            error_count=len(result.problems) + len(result.unexpected),
+            remedy="Rebuild, or find out which run produced these files.",
         )
 
 

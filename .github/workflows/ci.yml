@@ -95,7 +95,7 @@ jobs:
 
       - name: every command has help
         run: |
-          for command in init status extract adopt check export import build pretranslate stats doctor memory diff font verify pack-diff prune; do
+          for command in init status extract adopt check export import build pretranslate stats doctor memory diff font verify pack-diff audit prune; do
             v4t-translate "$command" --help > /dev/null
           done
 
