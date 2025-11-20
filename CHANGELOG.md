@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.4.0
+
+The release the build machines needed. 0.3 could do a round; this one can be
+trusted to do it unattended and can prove afterwards what it did.
+
+### Builds you can reproduce and check
+
+- `SOURCE_DATE_EPOCH` pins every timestamp the outputs carry. Set it to the
+  commit time and a rebuild of that commit is the archive, byte for byte.
+- `build --reproducible` builds twice into memory and fails if the two differ.
+- `audit` checks a directory of built files against the manifest that says
+  what they are, including files the manifest does not mention.
+- `pack-diff` says which strings differ between two `.v4l` packs, and refuses
+  to compare two whose signatures disagree instead of producing nonsense.
+- Catalog format 2 puts the source paths in one table. Moving a `.rc` used to
+  rewrite a line under every message that came out of it.
+
+### Running unattended
+
+- One writer at a time. The operations that read, change and write the catalog
+  take a lock, which expires so a killed run does not block the next one.
+- `--log-file` appends a JSON object per step, with timings. Field names that
+  look like credentials never reach it.
+- `--timings` prints where the time went without writing anything.
+- Every error carries a remedy, and the exit codes are documented and tested.
+  4 means somebody else is writing and is the only one worth retrying.
+- The project file rejects a key it does not understand. `glosary` silently
+  turned the terminology check off for three languages.
+
+### Getting work in and out
+
+- `adopt` lifts a language's answers out of an already translated `.rc`,
+  aligned by position rather than by text.
+- XLIFF 1.2 out and back, which is what two of the agencies asked for.
+- `export --parts` splits a language across translators without splitting a
+  dialog.
+- The workbook carries the agreed terms, including the renderings that were
+  rejected.
+- The reader finds the translation sheet even when the tabs were reordered.
+
+### Checking
+
+- `check --since` reports only what moved, for a review.
+- `check --explain` says what a rule is for, in the words of whoever wrote it.
+- SARIF output, anchored to the line of the `.rc`.
+- Waivers: an accepted finding, with an owner and a date it expires.
+- `shortcuts`: the menu hint may translate Ctrl to Strg and may not move the
+  key, which is bound in the accelerator table and is not translated.
+- Right to left dialogs get `WS_EX_LAYOUTRTL`, and a bidi finding now shows a
+  string that would render correctly rather than only saying this one will not.
+- `collisions` split into three separately nameable analyses.
+- `font coverage` and `font subset`, in both directions.
+- `status` says whether the project can ship and what is stopping it.
+- `stats --record` keeps the coverage numbers so they can be compared.
+
 ## 0.3.0
 
 The round, end to end, with the parts that were still manual.
