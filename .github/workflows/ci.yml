@@ -75,10 +75,18 @@ jobs:
           if-no-files-found: ignore
 
   selfcheck:
-    # The tool has to be able to check its own worked example, because that
-    # config is what everybody copies and a broken one costs a day each time.
-    runs-on: ubuntu-latest
+    # Against a built wheel rather than the checkout. The unit tests import
+    # from src/ and pass on a machine where the installed package is broken:
+    # an entry point that was never registered, a module missing from the
+    # wheel, a data file nobody added to the manifest. This is the only job
+    # that can see any of that.
+    runs-on: ${{ matrix.os }}
     needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -88,18 +96,30 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - run: python -m pip install -e ".[dev]"
+      - name: build a wheel
+        run: |
+          python -m pip install build
+          python -m build --wheel --outdir dist
+
+      - name: install it, and nothing else
+        shell: bash
+        run: python -m pip install dist/*.whl
 
       - name: the console script is installed and runs
         run: v4t-translate --version
 
       - name: every command has help
+        shell: bash
         run: |
           for command in init status extract adopt check export import build pretranslate stats doctor memory diff font verify pack-diff audit prune; do
             v4t-translate "$command" --help > /dev/null
           done
 
+      - name: one round, start to finish
+        run: python tools/selfcheck.py
+
       - name: the worked example config parses
+        # It is the config everybody copies, and a broken one costs a day.
         run: >-
           python -c "from v4t_translate.config import load_config;
           c = load_config('v4t-translate.toml');
