@@ -11,6 +11,13 @@ Only translated strings are written. Android falls back to the default
 ``values/`` directory for anything missing, which is exactly the behaviour we
 want and is better than writing English into a German file, where it would
 look deliberate.
+
+Plurals and arrays go back out as ``<plurals>`` and ``<string-array>``. They
+used to come out as flattened ``<string name="pen_count_one">``, which parses,
+builds, installs and never resolves: the code asks for ``pen_count`` with a
+quantity and there is no ``pen_count`` in the localised file, so every device
+in that language falls back to English for it. Nothing errors anywhere along
+that path.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ from ..catalog.model import OriginKind
 from ..catalog.store import Catalog
 from ..catalog.translations import TranslationSet
 from ..locales import Locale
+from ..plurals import CATEGORIES
 from ..sources.androidxml import escape_android
 from .base import EmitOptions, EmitResult
 
@@ -64,6 +72,7 @@ class AndroidXmlEmitter:
         result = EmitResult(path=options.path)
 
         lines = [_HEADER, _NOTE, "<resources>\n"]
+        grouped: dict[str, list[tuple[str, str]]] = {}
 
         for key in catalog.sorted_keys():
             message = catalog.messages[key]
@@ -84,9 +93,17 @@ class AndroidXmlEmitter:
                 continue
 
             for name in names:
-                lines.append(_element(name, translation.text))
+                base, qualifier = _split_name(name)
+                if qualifier is None:
+                    lines.append(_string(name, translation.text))
+                else:
+                    grouped.setdefault(base, []).append(
+                        (qualifier, translation.text)
+                    )
+
             result.written += 1
 
+        lines.extend(_grouped(grouped))
         lines.append("</resources>\n")
 
         options.path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,25 +124,74 @@ def _android_names(message) -> list[str]:
     return names
 
 
-def _element(name: str, text: str) -> str:
-    """One resource element.
+def _split_name(name: str) -> tuple[str, str | None]:
+    """``pen_count[one]`` into its resource name and its qualifier.
 
-    Two layers of escaping and they are not the same. XML escaping handles the
-    angle brackets and ampersands so the file parses. Android escaping handles
-    the apostrophe and the surrounding quotes so the platform's own string
-    reader gives back what was meant. Both are needed and in this order.
+    The qualifier is a quantity for a plurals resource and an index for an
+    array, and which it is can be told from whether it is a number.
     """
-    if "[" in name:
-        base, _, rest = name.partition("[")
-        index = rest.rstrip("]")
-        return f'  <!-- {base} item {index} -->\n  <string name="{_id(name)}">' \
-               f'{_body(text)}</string>\n'
+    if "[" not in name or not name.endswith("]"):
+        return (name, None)
+    base, _, rest = name.partition("[")
+    return (base, rest[:-1])
+
+
+def _string(name: str, text: str) -> str:
     return f'  <string name="{name}">{_body(text)}</string>\n'
 
 
-def _id(name: str) -> str:
-    """Flatten a plural or array symbol into something aapt accepts."""
-    return name.replace("[", "_").replace("]", "")
+def _grouped(grouped: dict[str, list[tuple[str, str]]]) -> list[str]:
+    """The plurals and arrays, in name order.
+
+    Written after the plain strings rather than interleaved, because the items
+    of one resource arrive scattered through the catalog: they are separate
+    messages with separate keys and they sort by their English.
+    """
+    lines: list[str] = []
+
+    for base in sorted(grouped):
+        items = grouped[base]
+        if all(qualifier.isdigit() for qualifier, _ in items):
+            lines.extend(_array(base, items))
+        else:
+            lines.extend(_plurals(base, items))
+
+    return lines
+
+
+def _plurals(name: str, items: list[tuple[str, str]]) -> list[str]:
+    """A ``<plurals>``, with its items in Android's category order.
+
+    A category this build does not know is kept and written last rather than
+    dropped. The set has grown before and a resource the tool does not
+    understand is still somebody's work.
+    """
+    def order(entry: tuple[str, str]) -> tuple[int, str]:
+        quantity = entry[0]
+        known = quantity in CATEGORIES
+        return (CATEGORIES.index(quantity) if known else len(CATEGORIES), quantity)
+
+    lines = [f'  <plurals name="{name}">\n']
+    for quantity, text in sorted(items, key=order):
+        lines.append(
+            f'    <item quantity="{quantity}">{_body(text)}</item>\n'
+        )
+    lines.append("  </plurals>\n")
+    return lines
+
+
+def _array(name: str, items: list[tuple[str, str]]) -> list[str]:
+    """A ``<string-array>``, in index order.
+
+    Order is the whole meaning of an array: the code indexes into it. Sorting
+    the indices numerically rather than as strings matters the moment one has
+    ten items in it.
+    """
+    lines = [f'  <string-array name="{name}">\n']
+    for _, text in sorted(items, key=lambda entry: int(entry[0])):
+        lines.append(f"    <item>{_body(text)}</item>\n")
+    lines.append("  </string-array>\n")
+    return lines
 
 
 def _body(text: str) -> str:

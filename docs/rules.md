@@ -146,6 +146,20 @@ at once, so they cannot be rules, which see one message. They are named,
 disabled, promoted and demoted exactly like a rule, and they land in the same
 report, because that distinction is ours and not the reader's.
 
+## plurals
+
+A plural resource with the forms the target language actually needs.
+
+The English resources were written with `one` and `other`, because English has
+two. Polish has three and Arabic has six. A Polish `<plurals>` carrying only
+`one` and `other` is not a translation with a gap in it: the platform picks
+`other` for two, three and four, so the panel says the Polish for five pens
+when there are two, and nothing anywhere reports it.
+
+Extra forms are a warning rather than an error. The platform never selects
+them, so they are harmless, and they are also somebody's paid work sitting in
+a file doing nothing.
+
 ## collisions
 
 Two controls on one dialog claiming the same Alt key.

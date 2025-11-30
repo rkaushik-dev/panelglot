@@ -17,6 +17,7 @@ from ..rules.result import Finding, Severity
 from .base import Analysis, AnalysisContext
 from .collisions import CollisionAnalysis
 from .merged import MergedAnalysis
+from .plurals import PluralAnalysis
 from .untranslated import UntranslatedAnalysis
 
 __all__ = ["ALL_ANALYSES", "analysis_names", "build_analyses"]
@@ -34,6 +35,7 @@ class AnalysisType(Protocol):
 
 #: Worst consequence first, same as the rules.
 ALL_ANALYSES: tuple[AnalysisType, ...] = (
+    PluralAnalysis,        # the wrong wording for a count, silently
     CollisionAnalysis,     # two controls answer one key
     UntranslatedAnalysis,  # a delivery that was not done
     MergedAnalysis,        # a distinction that was lost

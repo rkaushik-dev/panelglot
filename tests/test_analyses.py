@@ -90,8 +90,9 @@ def project(tmp_path, sample_rc_path):
 # -- the registry -------------------------------------------------------
 
 
-def test_the_three_analyses_are_named():
-    assert analysis_names() == ["collisions", "untranslated", "merged"]
+def test_the_analyses_are_named_in_report_order():
+    assert analysis_names() == ["plurals", "collisions", "untranslated",
+                                "merged"]
 
 
 def test_each_one_satisfies_the_protocol():
@@ -110,13 +111,13 @@ def test_no_name_is_used_twice():
     assert len(known_rule_names()) == len(set(known_rule_names()))
 
 
-def test_all_three_are_built_by_default():
-    assert len(build_analyses()) == 3
+def test_all_of_them_are_built_by_default():
+    assert len(build_analyses()) == len(analysis_names())
 
 
 def test_one_can_be_disabled_on_its_own():
     built = build_analyses(CheckSettings(disabled_rules=("merged",)))
-    assert [a.name for a in built] == ["collisions", "untranslated"]
+    assert [a.name for a in built] == ["plurals", "collisions", "untranslated"]
 
 
 def test_disabling_one_no_longer_disables_the_others():
