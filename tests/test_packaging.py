@@ -134,7 +134,7 @@ def test_the_help_lists_every_command():
 
 
 def test_no_command_is_missing_from_the_ci_list():
+    from tests.test_cli_structure import listed
+
     output = CliRunner().invoke(main, ["--help"]).output
-    body = output.split("Commands:", 1)[1]
-    listed = [line.split()[0] for line in body.splitlines() if line.strip()]
-    assert sorted(listed) == sorted(CI_COMMANDS)
+    assert sorted(listed(output)) == sorted(CI_COMMANDS)

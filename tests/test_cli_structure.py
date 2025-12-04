@@ -22,8 +22,21 @@ def runner():
 
 
 def listed(output: str) -> list[str]:
+    """The command names out of --help.
+
+    Stops at the first blank line after the list, because the epilog follows
+    it and its lines look enough like command entries to be counted as some.
+    """
     body = output.split("Commands:", 1)[1]
-    return [line.split()[0] for line in body.splitlines() if line.strip()]
+
+    names: list[str] = []
+    for line in body.splitlines():
+        if not line.strip():
+            if names:
+                break
+            continue
+        names.append(line.split()[0])
+    return names
 
 
 def test_every_command_is_attached():

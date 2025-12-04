@@ -27,6 +27,42 @@ v4t-translate extract
 `catalog/`, and reports what changed. It writes nothing outside the catalog
 directory. Add `--dry-run` to write nothing at all.
 
+## A round
+
+```
+v4t-translate status                 where the project is, and what is stopping it
+v4t-translate extract                read the sources into the catalog
+v4t-translate export                 write the workbook a translator gets sent
+v4t-translate import <delivery>      read a workbook or an XLIFF back in
+v4t-translate check                  run every rule over what came back
+v4t-translate build                  write the localised outputs
+v4t-translate audit out/manifest.json   prove the outputs are what shipped
+```
+
+`v4t-translate check --explain <rule>` says what any rule is for. `--explain
+all` lists them.
+
+For a product that is already translated and has no catalog, `adopt` lifts the
+answers out of the existing localised files.
+
+## Documentation
+
+| what | where |
+| --- | --- |
+| every rule and analysis, and why it exists | [docs/rules.md](docs/rules.md) |
+| the catalog and translation file formats | [docs/catalog-format.md](docs/catalog-format.md) |
+| the `.v4l` language pack container | [docs/v4l-container.md](docs/v4l-container.md) |
+| how a round actually runs | [docs/workflow.md](docs/workflow.md) |
+| accepting a finding, with a date on it | [docs/waivers.md](docs/waivers.md) |
+| what each exit code means, and which to retry | [docs/exit-codes.md](docs/exit-codes.md) |
+
+## Builds you can reproduce
+
+Set `SOURCE_DATE_EPOCH` to the commit time and a rebuild of that commit is the
+archive, byte for byte. `build --reproducible` builds twice and fails if the
+two differ; `audit` checks a directory against the manifest that says what is
+in it.
+
 ## Configuration
 
 One `v4t-translate.toml` at the root of the project. Paths in it resolve
@@ -53,8 +89,23 @@ panels it is the most common one:
 src/v4t_translate/
     catalog/     messages, translations, merge, on-disk format
     sources/     readers, one package per dialect
-    layout/      dialog units, fonts, what fits
+    layout/      dialog units, fonts, mirroring, what fits
+    rules/       the checks that see one message
+    analyses/    the checks that need the whole language
+    emit/        writers, one per output format
+    mt/          translation memory and machine translation
+    report/      console, JSON, JUnit, SARIF, HTML
+    workbook/    the spreadsheet a translator gets
     ops/         the operations the CLI exposes
+    cli/         one module per command
 tests/
+tools/           selfcheck.py, one round against a built wheel
 Translate/       the translator workbooks, as delivered
 ```
+
+## Running it unattended
+
+The operations that change the catalog take a lock, so two people importing at
+once cannot lose a delivery. `--log-file` appends a JSON object per step with
+timings, and never writes a field whose name looks like a credential. Exit
+code 4 means somebody else is writing and is the only one worth retrying.

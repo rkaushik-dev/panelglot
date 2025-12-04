@@ -26,7 +26,30 @@ from ..versions import describe
 from .commands import register
 from .context import Context, pass_context
 
-__all__ = ["main", "run", "Context", "pass_context"]
+__all__ = ["main", "run", "Context", "pass_context", "DOCUMENTATION"]
+
+
+#: What to read next, and what it answers. Kept here rather than typed into
+#: the docstring so a test can check every file in docs/ is reachable from the
+#: help. A document nobody links to is a document nobody reads, and this tool
+#: has more of them than anybody expects.
+DOCUMENTATION: tuple[tuple[str, str], ...] = (
+    ("docs/rules.md", "every check, and why it exists"),
+    ("docs/workflow.md", "how a round actually runs"),
+    ("docs/catalog-format.md", "what is in the catalog files"),
+    ("docs/v4l-container.md", "the language pack the firmware loads"),
+    ("docs/waivers.md", "accepting a finding, with a date on it"),
+    ("docs/exit-codes.md", "what each exit code means"),
+)
+
+_EPILOG = "\n".join([
+    "A round: extract, export, import, check, build, audit.",
+    "",
+    "Reading:",
+    *(f"  {path:<26} {what}" for path, what in DOCUMENTATION),
+    "",
+    "check --explain <rule> says what any one check is for.",
+])
 
 
 class OrderedGroup(click.Group):
@@ -57,7 +80,8 @@ def _version(ctx: click.Context, param: click.Parameter, value: bool) -> None:
     ctx.exit()
 
 
-@click.group(cls=OrderedGroup, context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(cls=OrderedGroup, epilog=_EPILOG,
+             context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--version", "-V", is_flag=True, expose_value=False, is_eager=True,
               callback=_version,
               help="Print the version. With -v, the whole build.")
