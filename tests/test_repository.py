@@ -41,6 +41,29 @@ def files():
     return found
 
 
+def test_no_test_module_imports_another(files):
+    """A test module importing a sibling only resolves by accident.
+
+    `python -m pytest` puts the working directory on sys.path and the
+    `pytest` console script does not, so `from tests.other import helper`
+    passes locally and fails on every CI runner. It did, on all four, and it
+    is invisible until something runs the suite the other way. Shared helpers
+    go in conftest as fixtures.
+    """
+    import re
+
+    pattern = re.compile(r"^\s*(?:from|import)\s+(?:tests|conftest)\b", re.M)
+
+    offenders = [
+        path.relative_to(ROOT).as_posix()
+        for path in files
+        if path.suffix == ".py"
+        and path.parent.name == "tests"
+        and pattern.search(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []
+
+
 def test_no_file_has_windows_line_endings(files):
     offenders = [
         path.relative_to(ROOT).as_posix()

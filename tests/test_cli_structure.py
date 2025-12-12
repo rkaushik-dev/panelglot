@@ -21,43 +21,22 @@ def runner():
     return CliRunner()
 
 
-def listed(output: str) -> list[str]:
-    """The command names out of --help.
-
-    Stops at the first blank line after the list, because the epilog follows
-    it and its lines look enough like command entries to be counted as some.
-    """
-    body = output.split("Commands:", 1)[1]
-
-    names: list[str] = []
-    for line in body.splitlines():
-        if not line.strip():
-            if names:
-                break
-            continue
-        names.append(line.split()[0])
-    return names
-
-
 def test_every_command_is_attached():
     assert set(main.commands) == {command.name for command in COMMANDS}
 
 
-def test_the_help_lists_them_in_working_order(runner):
-    order = listed(runner.invoke(main, ["--help"]).output)
-    assert order == [command.name for command in COMMANDS]
+def test_the_help_lists_them_in_working_order(help_commands):
+    assert help_commands == [command.name for command in COMMANDS]
 
 
-def test_the_help_starts_where_the_work_does(runner):
-    order = listed(runner.invoke(main, ["--help"]).output)
-    assert order[:3] == ["init", "status", "extract"]
-    assert order.index("build") > order.index("check")
-    assert order.index("check") > order.index("extract")
+def test_the_help_starts_where_the_work_does(help_commands):
+    assert help_commands[:3] == ["init", "status", "extract"]
+    assert help_commands.index("build") > help_commands.index("check")
+    assert help_commands.index("check") > help_commands.index("extract")
 
 
-def test_the_order_is_not_alphabetical(runner):
-    order = listed(runner.invoke(main, ["--help"]).output)
-    assert order != sorted(order)
+def test_the_order_is_not_alphabetical(help_commands):
+    assert help_commands != sorted(help_commands)
 
 
 @pytest.mark.parametrize("command", [c.name for c in COMMANDS])

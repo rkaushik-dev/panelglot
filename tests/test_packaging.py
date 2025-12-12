@@ -133,8 +133,5 @@ def test_the_help_lists_every_command():
         assert command in output
 
 
-def test_no_command_is_missing_from_the_ci_list():
-    from tests.test_cli_structure import listed
-
-    output = CliRunner().invoke(main, ["--help"]).output
-    assert sorted(listed(output)) == sorted(CI_COMMANDS)
+def test_no_command_is_missing_from_the_ci_list(help_commands):
+    assert sorted(help_commands) == sorted(CI_COMMANDS)
